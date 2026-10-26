@@ -5,7 +5,7 @@ profile_id = "v2020"
 description = "Padroes canonicos do subsistema VOTA para eleicoes municipais e anteriores (<= 2020)"
 encoding = "latin-1"
 case_insensitive = true
-vota_app_tokens = ["VOTA", "GAP", "RED", "SCUE"]
+vota_app_tokens = ["VOTA", "GAP"]
 
 [events]
 VOTING_OPENED = [

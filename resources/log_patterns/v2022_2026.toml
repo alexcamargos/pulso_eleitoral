@@ -5,7 +5,7 @@ profile_id = "v2022_2026"
 description = "Padroes canonicos do subsistema VOTA e GAP para eleicoes 2022 a 2026"
 encoding = "latin-1"
 case_insensitive = true
-vota_app_tokens = ["VOTA", "GAP", "RED", "SCUE"]
+vota_app_tokens = ["VOTA", "GAP"]
 
 [events]
 VOTING_OPENED = [
