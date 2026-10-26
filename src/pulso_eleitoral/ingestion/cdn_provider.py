@@ -529,13 +529,14 @@ class CdnArtifactProvider:
                         if isinstance(fname, str) and isinstance(fhash, str):
                             per_file_hashes[fname] = fhash.strip()
 
-            nmarq = entry.get("nmarq")
+            nmarq = entry.get("nmarq") or entry.get("arq")
             if not isinstance(nmarq, list):
                 continue
 
             for file_entry in nmarq:
                 filename = ""
                 expected_sha: str | None = None
+                file_type: str | None = None
                 if isinstance(file_entry, str):
                     filename = file_entry.strip()
                     expected_sha = per_file_hashes.get(filename)
@@ -548,15 +549,31 @@ class CdnArtifactProvider:
                         expected_sha = raw_sha.strip()
                     elif filename:
                         expected_sha = per_file_hashes.get(filename)
+                    raw_tp = file_entry.get("tp") or file_entry.get("type")
+                    if isinstance(raw_tp, str):
+                        file_type = raw_tp.strip().lower()
 
                 if not filename or (hash_dir, filename) in seen_files:
                     continue
                 seen_files.add((hash_dir, filename))
 
                 lower_name = filename.lower()
-                if lower_name.endswith((".logjez", ".jez")):
+                is_log = (
+                    file_type in ("log", "logjez")
+                    or lower_name.endswith((".logjez", ".jez"))
+                    or "-log." in lower_name
+                )
+                is_bu = (
+                    file_type == "bu"
+                    or lower_name.endswith((".bu", "-bu.dat"))
+                    or (
+                        "-bu." in lower_name
+                        and not lower_name.endswith((".rdv", ".vsc", ".imgbu"))
+                    )
+                )
+                if is_log:
                     log_targets.append((hash_dir, filename, expected_sha))
-                elif lower_name.endswith((".bu", "-bu.dat")):
+                elif is_bu:
                     bu_targets.append((hash_dir, filename, expected_sha))
 
         if not log_targets:
@@ -704,7 +721,16 @@ class CdnArtifactProvider:
 
         try:
             cs_url = self.build_cs_url(norm_uf)
-            cs_bytes = await self._get_bytes_with_retry(client, cs_url)
+            try:
+                cs_bytes = await self._get_bytes_with_retry(client, cs_url)
+            except MissingLogError as exc:
+                raise MissingLogError(
+                    f"Índice estadual '{norm_uf}' não encontrado no CDN do TSE (HTTP 404: {cs_url}). "
+                    "Nota: O CDN oficial (resultados.tse.jus.br) disponibiliza apenas pleitos recentes "
+                    "ativos. Para pleitos anteriores ou consolidados (ex.: 2022 ou 2020), "
+                    "utilize '--source zip' para obter os pacotes do Portal de Dados Abertos.",
+                    source_uri=cs_url,
+                ) from exc
             pending_sections = self._parse_cs_sections(
                 cs_bytes,
                 norm_uf,
