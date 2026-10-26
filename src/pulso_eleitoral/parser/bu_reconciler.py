@@ -287,7 +287,7 @@ def _try_decode_with_ber_tlv_walker(bu_raw_bytes: bytes) -> BuReconciliationData
         if not children:
             continue
 
-        # Padrao ResultadoVotacaoPorEleicao: [INTEGER id, INTEGER aptos, ..., SEQUENCE OF ResultadoVotacao]
+        # Padrao ResultadoVotacaoPorEleicao: [id, aptos, ..., SEQUENCE OF RV]
         if (
             len(children) >= 3
             and children[0][0] == 0x02

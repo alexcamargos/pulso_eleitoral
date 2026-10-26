@@ -725,10 +725,11 @@ class CdnArtifactProvider:
                 cs_bytes = await self._get_bytes_with_retry(client, cs_url)
             except MissingLogError as exc:
                 raise MissingLogError(
-                    f"Índice estadual '{norm_uf}' não encontrado no CDN do TSE (HTTP 404: {cs_url}). "
-                    "Nota: O CDN oficial (resultados.tse.jus.br) disponibiliza apenas pleitos recentes "
-                    "ativos. Para pleitos anteriores ou consolidados (ex.: 2022 ou 2020), "
-                    "utilize '--source zip' para obter os pacotes do Portal de Dados Abertos.",
+                    f"Índice estadual '{norm_uf}' não encontrado no CDN do TSE "
+                    f"(HTTP 404: {cs_url}). Nota: O CDN oficial "
+                    "(resultados.tse.jus.br) disponibiliza apenas pleitos recentes "
+                    "ativos. Para pleitos anteriores ou consolidados (ex.: 2022), "
+                    "utilize '--source zip' para pacotes do Portal de Dados Abertos.",
                     source_uri=cs_url,
                 ) from exc
             pending_sections = self._parse_cs_sections(

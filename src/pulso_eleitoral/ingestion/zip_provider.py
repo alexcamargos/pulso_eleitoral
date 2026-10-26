@@ -199,7 +199,8 @@ class BulkZipArtifactProvider:
         elif f"eleicoes{self._run_cfg.ano_eleicao}" in base_url:
             url = f"{base_url}/arqurnatot/{filename}"
         else:
-            url = f"{base_url}/eleicoes{self._run_cfg.ano_eleicao}/arqurnatot/{filename}"
+            ano = self._run_cfg.ano_eleicao
+            url = f"{base_url}/eleicoes{ano}/arqurnatot/{filename}"
 
         owns_client = self._http_client is None
         client = self._http_client or httpx.AsyncClient(
@@ -231,9 +232,10 @@ class BulkZipArtifactProvider:
                         f"Pacote ZIP estadual '{filename}' não encontrado "
                         f"{local_info}no portal de dados abertos do TSE "
                         f"(HTTP {response.status_code}: {url}). "
-                        "Atenção: Para pleitos recentes ou segundo turno recém-realizado, os pacotes "
-                        "consolidados de dados abertos podem ainda não ter sido publicados pelo TSE. "
-                        "Utilize '--source cdn' para auditar diretamente via CDN oficial de resultados.",
+                        "Atenção: Para pleitos recentes ou segundo turno recém-"
+                        "realizado, os pacotes consolidados de dados abertos podem "
+                        "ainda não ter sido publicados pelo TSE. Utilize "
+                        "'--source cdn' para auditar diretamente via CDN oficial.",
                         source_uri=url,
                         attempt_count=1,
                     )
