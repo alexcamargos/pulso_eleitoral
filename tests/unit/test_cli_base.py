@@ -51,13 +51,12 @@ def test_cli_version_and_help_commands() -> None:
 @pytest.mark.parametrize(
     "args",
     [
-        ["export-json"],
-        ["verify"],
-        ["run-all"],
+        ["export-json", "--db-path", "missing.duckdb"],
+        ["verify", "--db-path", "missing.duckdb"],
     ],
 )
-def test_cli_placeholder_subcommands_validate_arguments(args: list[str]) -> None:
-    """Confirma validação de argumentos e retorno exit code 2 nos placeholders.
+def test_cli_subcommands_fail_gracefully_when_db_missing(args: list[str]) -> None:
+    """Confirma falha graciosa dos subcomandos quando banco DuckDB não existe.
 
     Args:
         args: Lista de argumentos da linha de comando a invocar.
@@ -69,7 +68,7 @@ def test_cli_placeholder_subcommands_validate_arguments(args: list[str]) -> None
         Nenhum.
     """
     result = runner.invoke(app, args)
-    assert result.exit_code == 2
+    assert result.exit_code == 1
 
 
 def test_cli_main_entrypoint_invokes_typer_app(mocker: MockerFixture) -> None:
