@@ -98,8 +98,8 @@ stateDiagram-v2
 4. **Isolamento Total entre Eleitores:** Todo evento `VOTE_CONFIRMED`, `VOTER_ABORTED`, `SYSTEM_REBOOT` ou novo `VOTER_SESSION_START` **limpa obrigatoriamente** `bio_mode = UNKNOWN`.
 5. **Detecção de Relógio Descalibrado (`relogio_suspeito`):**
    - Marca-se `relogio_suspeito = TRUE` se qualquer uma das condições ocorrer:
-     - `votos_antes_08h > 0` (voto confirmado antes de `08:00:00` no fuso local da seção);
-     - `horario_abertura_local < 07:00:00` (abertura fora da janela operacional permitida pelo TSE);
+     - `votos_antes_08h > 0` (voto confirmado antes de `08:00:00` no referencial `ts_ref` do pleito — `BRT` em `UNIFIED_BRT` ou local em `LOCAL_TIME`);
+     - `horario_abertura_ref < 07:00:00` (abertura fora da janela operacional permitida pelo TSE no referencial `ts_ref`);
      - Regressão monotônica de relógio superior a `60 segundos` entre duas linhas consecutivas de `VOTA` na mesma urna.
 
 ---
