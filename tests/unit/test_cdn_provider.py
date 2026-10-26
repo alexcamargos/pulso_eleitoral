@@ -573,3 +573,143 @@ async def test_cdn_provider_emits_aggregated_section_without_http(
     assert main_bundle.secao == 1
 
     await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_cdn_provider_handles_429_with_cooldown_and_recovers(
+    base_run_cfg: ElectionRunConfig,
+    mock_tz_catalog: TimezoneCatalog,
+) -> None:
+    """Verifica resfriamento e recuperação bem-sucedida após HTTP 429.
+
+    Args:
+        base_run_cfg: Configuração da eleição.
+        mock_tz_catalog: Catálogo de fusos.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+    settings = PipelineSettings(http_max_retries=3)
+    cs_data = {
+        "mu": [
+            {
+                "cd": "30015",
+                "zon": [{"cd": "0001", "sec": [{"ns": "0001"}]}],
+            }
+        ]
+    }
+    aux_data = {
+        "hashes": [
+            {
+                "hash": "h1",
+                "arq": [{"nm": "o00406-3001500010001.logjez", "tp": "log"}],
+            }
+        ]
+    }
+    log_calls = 0
+    sleeps: list[float] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal log_calls
+        url_str = str(request.url)
+        if url_str.endswith("cs.json"):
+            return httpx.Response(200, content=orjson.dumps(cs_data))
+        if url_str.endswith("aux.json"):
+            return httpx.Response(200, content=orjson.dumps(aux_data))
+        if url_str.endswith(".logjez"):
+            log_calls += 1
+            if log_calls == 1:
+                # 1ª tentativa: 429 Too Many Requests com Retry-After: 6
+                return httpx.Response(
+                    429,
+                    headers={"Retry-After": "6"},
+                    content=b"Too Many Requests",
+                )
+            # 2ª tentativa: Sucesso 200
+            return httpx.Response(200, content=b"recovered log payload")
+        return httpx.Response(404)
+
+    async def fake_sleep(sec: float) -> None:
+        sleeps.append(sec)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    provider = CdnArtifactProvider(
+        base_run_cfg,
+        settings,
+        mock_tz_catalog,
+        http_client=client,
+        sleep_func=fake_sleep,
+    )
+
+    items = [item async for item in provider.stream_uf("PE")]
+    assert len(items) == 1
+    assert isinstance(items[0], SectionArtifactBundle)
+    assert log_calls == 2
+    assert len(sleeps) >= 1
+    assert sleeps[0] >= 6.0  # Respeitou o Retry-After
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_cdn_provider_cs_url_429_extended_retries(
+    base_run_cfg: ElectionRunConfig,
+    mock_tz_catalog: TimezoneCatalog,
+) -> None:
+    """Verifica resiliência do índice -cs.json a 429 transitório com retries.
+
+    Args:
+        base_run_cfg: Configuração da eleição.
+        mock_tz_catalog: Catálogo de fusos.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+    settings = PipelineSettings(http_max_retries=2)  # Base de apenas 2 retries
+    cs_calls = 0
+    sleeps: list[float] = []
+    fake_now = 1000.0
+
+    def fake_time() -> float:
+        return fake_now
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal cs_calls
+        url_str = str(request.url)
+        if url_str.endswith("cs.json"):
+            cs_calls += 1
+            if cs_calls < 4:
+                # Primeiras 3 chamadas retornam 429 sem Retry-After
+                return httpx.Response(429, content=b"Rate limited")
+            # 4ª tentativa sucede (requer mais que os 2 retries padrão do settings!)
+            return httpx.Response(200, content=orjson.dumps({"mu": []}))
+        return httpx.Response(404)
+
+    async def fake_sleep(sec: float) -> None:
+        nonlocal fake_now
+        sleeps.append(sec)
+        fake_now += sec
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    provider = CdnArtifactProvider(
+        base_run_cfg,
+        settings,
+        mock_tz_catalog,
+        http_client=client,
+        sleep_func=fake_sleep,
+        time_func=fake_time,
+    )
+
+    items = [item async for item in provider.stream_uf("PE")]
+    assert len(items) == 0  # mu vazio
+    assert cs_calls == 4
+    # Confirma que ocorreram 3 resfriamentos substanciais (>= 5.0s) de HTTP 429
+    cooldown_sleeps = [s for s in sleeps if s >= 5.0]
+    assert len(cooldown_sleeps) == 3
+    await client.aclose()
+

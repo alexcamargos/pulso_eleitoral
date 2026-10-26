@@ -18,7 +18,9 @@ Raises:
 from __future__ import annotations
 
 import asyncio
+import logging
 import random
+import time
 from collections.abc import AsyncIterator, Callable, Coroutine
 from datetime import UTC, datetime
 from typing import Any
@@ -49,8 +51,11 @@ from pulso_eleitoral.ingestion.resilience import (
     CircuitBreaker,
     TokenBucketRateLimiter,
     compute_full_jitter_delay,
+    compute_rate_limit_delay,
 )
 from pulso_eleitoral.ingestion.timezone import TimezoneCatalog
+
+logger = logging.getLogger(__name__)
 
 SleepFunc = Callable[[float], Coroutine[Any, Any, None]]
 
@@ -85,6 +90,7 @@ class CdnArtifactProvider:
         rate_limiter: TokenBucketRateLimiter | None = None,
         circuit_breaker: CircuitBreaker | None = None,
         sleep_func: SleepFunc = asyncio.sleep,
+        time_func: Callable[[], float] = time.monotonic,
         rng: random.Random | None = None,
     ) -> None:
         """Inicializa o provedor CDN com primitivas de resiliência HTTP.
@@ -97,6 +103,7 @@ class CdnArtifactProvider:
             rate_limiter: Limitador de taxa opcional.
             circuit_breaker: Disjuntor de falhas opcional.
             sleep_func: Corrotina de espera entre tentativas.
+            time_func: Função de relógio monotônico opcional.
             rng: Gerador pseudoaleatório opcional para jitter.
 
         Returns:
@@ -111,10 +118,13 @@ class CdnArtifactProvider:
         self._external_client = http_client
         self._semaphore = asyncio.Semaphore(settings.max_concurrent_requests)
         self._rate_limiter = rate_limiter or TokenBucketRateLimiter(
-            settings.requests_per_second
+            settings.requests_per_second,
+            sleep_func=sleep_func,
+            time_func=time_func,
         )
         self._circuit_breaker = circuit_breaker or CircuitBreaker()
         self._sleep = sleep_func
+        self._time = time_func
         self._rng = rng
 
     def build_cs_url(self, uf: str) -> str:
@@ -239,12 +249,15 @@ class CdnArtifactProvider:
         self,
         client: httpx.AsyncClient,
         url: str,
+        *,
+        max_attempts: int | None = None,
     ) -> bytes:
         """Executa `GET` com semáforo, Token Bucket, Circuit Breaker e Full Jitter.
 
         Args:
             client: Cliente HTTP ativo.
             url: URL completa a requisitar.
+            max_attempts: Limite de tentativas customizado (padrão do settings se None).
 
         Returns:
             Corpo binário da resposta HTTP `200`.
@@ -254,10 +267,10 @@ class CdnArtifactProvider:
             HttpExhaustedError: Quando falhas transitórias esgotam retentativas ou
                 ocorre erro HTTP não recuperável.
         """
-        max_attempts = self._settings.http_max_retries
+        attempts_limit = max_attempts or self._settings.http_max_retries
         last_reason = "Erro desconhecido"
 
-        for attempt in range(1, max_attempts + 1):
+        for attempt in range(1, attempts_limit + 1):
             await self._circuit_breaker.before_request()
             await self._rate_limiter.acquire()
 
@@ -268,7 +281,7 @@ class CdnArtifactProvider:
             except httpx.HTTPError as exc:
                 last_reason = f"{type(exc).__name__}: {exc}"
                 await self._circuit_breaker.record_failure()
-                if attempt < max_attempts:
+                if attempt < attempts_limit:
                     delay = compute_full_jitter_delay(attempt, rng=self._rng)
                     await self._sleep(delay)
                     continue
@@ -295,12 +308,29 @@ class CdnArtifactProvider:
                 last_reason = f"HTTP {status}"
                 retry_after = response.headers.get("Retry-After")
                 await self._circuit_breaker.record_failure()
-                if attempt < max_attempts:
-                    delay = compute_full_jitter_delay(
-                        attempt,
-                        retry_after_header=retry_after,
-                        rng=self._rng,
-                    )
+                if attempt < attempts_limit:
+                    if status == 429:
+                        delay = compute_rate_limit_delay(
+                            attempt,
+                            retry_after_header=retry_after,
+                            rng=self._rng,
+                        )
+                        logger.warning(
+                            "CDN TSE retornou HTTP 429 para %s. "
+                            "Aplicando resfriamento global de %.1fs "
+                            "(tentativa %d/%d)...",
+                            url,
+                            delay,
+                            attempt,
+                            attempts_limit,
+                        )
+                        await self._rate_limiter.apply_cooldown(delay)
+                    else:
+                        delay = compute_full_jitter_delay(
+                            attempt,
+                            retry_after_header=retry_after,
+                            rng=self._rng,
+                        )
                     await self._sleep(delay)
                     continue
                 raise HttpExhaustedError(
@@ -318,7 +348,7 @@ class CdnArtifactProvider:
         raise HttpExhaustedError(
             f"Tentativas HTTP esgotadas ({last_reason}).",
             source_uri=url,
-            attempt_count=max_attempts,
+            attempt_count=attempts_limit,
         )
 
     async def _fetch_verified_bytes(
@@ -732,7 +762,11 @@ class CdnArtifactProvider:
         try:
             cs_url = self.build_cs_url(norm_uf)
             try:
-                cs_bytes = await self._get_bytes_with_retry(client, cs_url)
+                cs_bytes = await self._get_bytes_with_retry(
+                    client,
+                    cs_url,
+                    max_attempts=max(self._settings.http_max_retries, 8),
+                )
             except MissingLogError as exc:
                 raise MissingLogError(
                     f"Índice estadual '{norm_uf}' não encontrado no CDN do TSE "
