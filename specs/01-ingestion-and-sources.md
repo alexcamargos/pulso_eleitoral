@@ -81,7 +81,7 @@ O arquivo `resources/dim_municipio_fuso.csv` deve ser versionado no repositório
 
 ### 3.2. Regras Geográficas Exatas do Brasil (Sem Exceções Omitidas)
 1. **`fuso_horario_offset_brt = +1` (`UTC-2`, `America/Noronha`):**
-   - Exclusivamente o distrito estadual de **Fernando de Noronha (`PE`)** (código IBGE `2605459` / código TSE `24350` — validado contra tabela oficial TSE do pleito).
+   - Exclusivamente o distrito estadual de **Fernando de Noronha (`PE`)** (código IBGE `2605459` / código TSE `30015` — validado contra tabela oficial TSE do pleito).
 2. **`fuso_horario_offset_brt = 0` (`UTC-3`, `America/Sao_Paulo` e equivalentes):**
    - Todos os municípios de: `AL`, `AP`, `BA`, `CE`, `DF`, `ES`, `GO`, `MA`, `MG`, `PA`, `PB`, `PI`, `PR`, `RJ`, `RN`, `RS`, `SC`, `SE`, `SP`, `TO`, e todos os municípios de `PE` **exceto** Fernando de Noronha.
 3. **`fuso_horario_offset_brt = -1` (`UTC-4`, `America/Manaus` / `America/Cuiaba` / `America/Campo_Grande`):**
