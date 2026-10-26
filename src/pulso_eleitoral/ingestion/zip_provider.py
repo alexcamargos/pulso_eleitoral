@@ -214,8 +214,15 @@ class BulkZipArtifactProvider:
         try:
             async with client.stream("GET", url) as response:
                 if response.status_code != 200:
+                    local_info = (
+                        f"localmente em '{self._run_cfg.input_dir}' nem "
+                        if self._run_cfg.input_dir
+                        else ""
+                    )
                     raise HttpExhaustedError(
-                        f"Falha HTTP {response.status_code} ao baixar pacote ZIP.",
+                        f"Pacote ZIP estadual '{filename}' não encontrado "
+                        f"{local_info}no portal de dados abertos do TSE "
+                        f"(HTTP {response.status_code}: {url}).",
                         source_uri=url,
                         attempt_count=1,
                     )
