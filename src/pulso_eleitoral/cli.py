@@ -308,10 +308,26 @@ def run_all(
     turno: Annotated[int, typer.Option("--turno", help="Turno (1 ou 2).")] = 1,
     pleito: Annotated[int, typer.Option("--pleito", help="ID do pleito TSE.")] = 406,
     uf: Annotated[str, typer.Option("--uf", help="Sigla da UF ou ALL.")] = "ALL",
+    municipio: Annotated[
+        str | None,
+        typer.Option("--municipio", "-m", help="Códigos TSE municipais para filtro."),
+    ] = None,
     source: Annotated[
         SourceMode,
         typer.Option("--source", help="Fonte oficial TSE (cdn ou zip)."),
     ] = SourceMode.ZIP,
+    input_dir: Annotated[
+        Path | None,
+        typer.Option("--input-dir", help="Diretório local dos pacotes estaduais."),
+    ] = None,
+    workers: Annotated[
+        int,
+        typer.Option("--workers", help="Workers paralelos no ProcessPoolExecutor."),
+    ] = 8,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Ignora checkpoints e reprocessa seções."),
+    ] = False,
     db_path: Annotated[
         Path,
         typer.Option("--db-path", help="Caminho do banco analítico DuckDB."),
@@ -328,7 +344,11 @@ def run_all(
         turno: Turno (`1` ou `2`).
         pleito: Identificador numérico do pleito no TSE.
         uf: UF alvo ou `"ALL"`.
+        municipio: Filtro opcional de municípios TSE.
         source: Modo de obtenção (`cdn` ou `zip`).
+        input_dir: Diretório de pacotes `.zip` estaduais.
+        workers: Quantidade de processos paralelos no pool.
+        force: Reprocessa seções mesmo se já consolidadas.
         db_path: Caminho do banco DuckDB.
         out_dir: Diretório de exportação JSON.
 
@@ -340,7 +360,17 @@ def run_all(
     """
     typer.echo(f"[pulso pipeline] Iniciando execução completa para pleito {pleito}...")
     # 1. Ingest-Parse
-    ingest_parse(ano=ano, turno=turno, pleito=pleito, uf=uf, source=source)
+    ingest_parse(
+        ano=ano,
+        turno=turno,
+        pleito=pleito,
+        uf=uf,
+        municipio=municipio,
+        source=source,
+        input_dir=input_dir,
+        workers=workers,
+        force=force,
+    )
     # 2. Consolidate
     consolidate(ano=ano, turno=turno, db_path=db_path)
     # 3. Export JSON
