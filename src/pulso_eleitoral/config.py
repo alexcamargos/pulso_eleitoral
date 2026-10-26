@@ -61,8 +61,12 @@ KNOWN_PLEITO_DATES: dict[int, str] = {
     305: "2020-11-29",
     406: "2022-10-02",
     407: "2022-10-30",
+    452: "2024-10-06",
+    453: "2024-10-27",
     456: "2024-10-06",
     457: "2024-10-27",
+    3220: "2026-10-04",
+    3221: "2026-10-25",
     6257: "2026-10-04",
     6258: "2026-10-25",
 }
@@ -302,7 +306,7 @@ class PipelineSettings(BaseSettings):
     max_in_flight_multiplier: Annotated[int, Field(ge=1, le=64)] = 16
     cdn_base_url: str = "https://resultados.tse.jus.br/oficial"
     open_data_base_url: str = (
-        "https://cdn.tse.jus.br/estatistica/sead/odsele/bu_imgbu_logjez_rdv_vscmr"
+        "https://cdn.tse.jus.br/estatistica/sead/eleicoes"
     )
     max_concurrent_requests: Annotated[int, Field(ge=1, le=256)] = 32
     requests_per_second: Annotated[float, Field(gt=0.0, le=500.0)] = 50.0

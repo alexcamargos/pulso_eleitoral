@@ -88,6 +88,15 @@ def cli_root(
     _ = version
 
 
+ELECTION_TO_PLEITO_MAP: dict[tuple[int, int], int] = {
+    # Mapeamento caso informado código de eleição federal no lugar do pleito:
+    (2026, 6257): 3220,
+    (2026, 6258): 3221,
+    (2024, 456): 452,
+    (2024, 457): 453,
+}
+
+
 def _resolve_default_pleito_id(ano: int, turno: int) -> int:
     """Resolve o ID canônico do pleito federal caso não seja especificado.
 
@@ -102,12 +111,31 @@ def _resolve_default_pleito_id(ano: int, turno: int) -> int:
         Nenhum.
     """
     if ano == 2026:
-        return 6257 if turno == 1 else 6258
+        return 3220 if turno == 1 else 3221
     if ano == 2024:
-        return 456 if turno == 1 else 457
+        return 452 if turno == 1 else 453
     if ano == 2020:
         return 304 if turno == 1 else 305
     return 406 if turno == 1 else 407
+
+
+def _resolve_target_pleito_id(ano: int, turno: int, pleito: int | None) -> int:
+    """Resolve o pleito alvo mapeando códigos de eleição informados por engano.
+
+    Args:
+        ano: Ano da eleição.
+        turno: Turno da eleição (1 ou 2).
+        pleito: Pleito informado na linha de comando ou None.
+
+    Returns:
+        Código canônico de pleito do TSE.
+
+    Raises:
+        Nenhum.
+    """
+    if pleito is not None:
+        return ELECTION_TO_PLEITO_MAP.get((ano, pleito), pleito)
+    return _resolve_default_pleito_id(ano, turno)
 
 
 @app.command("ingest-parse")
@@ -159,9 +187,7 @@ def ingest_parse(
         typer.Exit: Caso a execução falhe.
     """
     try:
-        resolved_pleito = (
-            pleito if pleito is not None else _resolve_default_pleito_id(ano, turno)
-        )
+        resolved_pleito = _resolve_target_pleito_id(ano, turno, pleito)
         mun_tuple: tuple[int, ...] = ()
         if municipio:
             mun_tuple = tuple(int(x.strip()) for x in municipio.split(",") if x.strip())
@@ -274,9 +300,7 @@ def export_json(
         typer.Exit: Caso ocorra falha na exportação.
     """
     try:
-        resolved_pleito = (
-            pleito if pleito is not None else _resolve_default_pleito_id(ano, turno)
-        )
+        resolved_pleito = _resolve_target_pleito_id(ano, turno, pleito)
         run_cfg = ElectionRunConfig(
             ano_eleicao=ano,
             turno=turno,
@@ -392,9 +416,7 @@ def run_all(
     Raises:
         typer.Exit: Caso alguma etapa falhe.
     """
-    resolved_pleito = (
-        pleito if pleito is not None else _resolve_default_pleito_id(ano, turno)
-    )
+    resolved_pleito = _resolve_target_pleito_id(ano, turno, pleito)
     typer.echo(
         f"[pulso pipeline] Iniciando execução completa para pleito {resolved_pleito}..."
     )
