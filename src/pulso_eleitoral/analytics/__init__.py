@@ -26,6 +26,10 @@ from pulso_eleitoral.analytics.schemas import (
     RAW_SECTION_METRICS_SCHEMA,
     UNPROCESSED_SECTIONS_SCHEMA,
 )
+from pulso_eleitoral.analytics.verifier import (
+    PipelineVerificationReport,
+    PipelineVerifier,
+)
 
 __all__ = [
     "RAW_SECTION_METRICS_SCHEMA",
@@ -33,6 +37,8 @@ __all__ = [
     "DuckDbConsolidator",
     "ParquetBatchWriter",
     "PipelineOrchestrator",
+    "PipelineVerificationReport",
+    "PipelineVerifier",
     "UfExecutionSummary",
     "validate_dataframe_invariants",
     "validate_denominator_completeness",
