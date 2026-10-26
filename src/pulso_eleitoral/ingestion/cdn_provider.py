@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import random
 from collections.abc import AsyncIterator, Callable, Coroutine
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -28,6 +29,7 @@ import orjson
 from pulso_eleitoral.config import ElectionRunConfig, PipelineSettings
 from pulso_eleitoral.contracts.exceptions import (
     CorruptArchiveError,
+    ErrorCode,
     HashMismatchError,
     HttpExhaustedError,
     MissingLogError,
@@ -362,8 +364,8 @@ class CdnArtifactProvider:
         norm_uf: str,
         checkpoint: IngestionCheckpoint | None,
         cs_url: str,
-    ) -> list[tuple[MunicipalityTzInfo, int, int]]:
-        """Extrai a lista ordenada `(tz_info, zona, secao)` do índice `-cs.json`.
+    ) -> list[tuple[MunicipalityTzInfo, int, int, int | None]]:
+        """Extrai seções `(tz_info, zona, secao, aggregated_to)` do `-cs.json`.
 
         Args:
             cs_bytes: Conteúdo JSON bruto do catálogo estadual `-cs.json`.
@@ -372,7 +374,8 @@ class CdnArtifactProvider:
             cs_url: URL diagnóstica do índice `-cs.json`.
 
         Returns:
-            Lista determinística de seções pendentes para download.
+            Lista determinística de seções pendentes para download ou registro.
+            O quarto elemento é o número da seção principal agregadora ou `None`.
 
         Raises:
             CorruptArchiveError: Se o JSON do índice estadual estiver malformado.
@@ -406,7 +409,7 @@ class CdnArtifactProvider:
             mu_entries.extend(m for m in direct_mu if isinstance(m, dict))
 
         mun_filter = frozenset(self._run_cfg.municipios)
-        sections: list[tuple[MunicipalityTzInfo, int, int]] = []
+        sections: list[tuple[MunicipalityTzInfo, int, int, int | None]] = []
         seen: set[tuple[int, int, int]] = set()
 
         for mu_obj in mu_entries:
@@ -436,8 +439,10 @@ class CdnArtifactProvider:
                 if not isinstance(sec_list, list):
                     continue
                 for sec_obj in sec_list:
+                    raw_nsp: object = None
                     if isinstance(sec_obj, dict):
                         raw_sec = sec_obj.get("ns") or sec_obj.get("cd")
+                        raw_nsp = sec_obj.get("nsp")
                     else:
                         raw_sec = sec_obj
                     if raw_sec is None:
@@ -451,7 +456,12 @@ class CdnArtifactProvider:
                         mun_cod, zona, secao
                     ):
                         continue
-                    sections.append((tz_info, zona, secao))
+                    aggregated_to: int | None = None
+                    if raw_nsp is not None:
+                        nsp_int = int(str(raw_nsp).strip())
+                        if nsp_int != secao:
+                            aggregated_to = nsp_int
+                    sections.append((tz_info, zona, secao, aggregated_to))
 
         sections.sort(key=lambda item: (item[0].municipio_cod_tse, item[1], item[2]))
         return sections
@@ -741,14 +751,56 @@ class CdnArtifactProvider:
             if not pending_sections:
                 return
 
+            regular_sections: list[tuple[MunicipalityTzInfo, int, int]] = []
+            aggregated_sections: list[tuple[MunicipalityTzInfo, int, int, int]] = []
+            for tz_info, zona, secao, aggregated_to in pending_sections:
+                if aggregated_to is not None:
+                    aggregated_sections.append((tz_info, zona, secao, aggregated_to))
+                else:
+                    regular_sections.append((tz_info, zona, secao))
+
+            # 1. Emitir seções agregadas conhecidas imediatamente sem requisições HTTP
+            for tz_info, zona, secao, agg_target in aggregated_sections:
+                assert self._run_cfg.cutoff_mode is not None
+                aux_url = self.build_aux_url(
+                    tz_info.uf,
+                    tz_info.municipio_cod_tse,
+                    zona,
+                    secao,
+                )
+                yield UnprocessedSectionError(
+                    ano_eleicao=self._run_cfg.ano_eleicao,
+                    turno=self._run_cfg.turno,
+                    pleito_id=self._run_cfg.pleito_id,
+                    uf=tz_info.uf,
+                    municipio_cod=tz_info.municipio_cod_tse,
+                    municipio_ibge=tz_info.municipio_cod_ibge,
+                    municipio_nome=tz_info.municipio_nome,
+                    zona=zona,
+                    secao=secao,
+                    fuso_horario_offset_brt=tz_info.fuso_horario_offset_brt,
+                    cutoff_mode=self._run_cfg.cutoff_mode.value,
+                    error_code=ErrorCode.MISSING_LOG.value,
+                    error_message=(
+                        f"Seção eleitoral agregada na seção principal {agg_target:04d} "
+                        "(sem urna física própria no CDN TSE)."
+                    ),
+                    recorded_at=datetime.now(UTC).replace(tzinfo=None),
+                    source_uri=aux_url,
+                    attempt_count=0,
+                )
+
+            if not regular_sections:
+                return
+
             work_queue: asyncio.Queue[tuple[MunicipalityTzInfo, int, int] | None] = (
                 asyncio.Queue()
             )
-            for item in pending_sections:
+            for item in regular_sections:
                 work_queue.put_nowait(item)
 
             worker_count = min(
-                len(pending_sections),
+                len(regular_sections),
                 self._settings.max_concurrent_requests,
             )
             for _ in range(worker_count):

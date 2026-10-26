@@ -485,3 +485,91 @@ async def test_cdn_provider_cs_url_404_informative_message(
 
     assert "--source zip" in str(exc_info.value)
     await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_cdn_provider_emits_aggregated_section_without_http(
+    base_run_cfg: ElectionRunConfig,
+    mock_tz_catalog: TimezoneCatalog,
+) -> None:
+    """Verifica emissão imediata de erro auditado para seções com nsp sem HTTP.
+
+    Args:
+        base_run_cfg: Configuração da eleição.
+        mock_tz_catalog: Catálogo de fusos.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+    settings = PipelineSettings()
+    cs_data = {
+        "mu": [
+            {
+                "cd": "30015",
+                "zon": [
+                    {
+                        "cd": "0001",
+                        "sec": [
+                            {"ns": "0001"},
+                            {"ns": "0002", "nsp": "0001"},
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+    fake_log = b"fake log"
+    aux_data = {
+        "hashes": [
+            {
+                "hash": "h1",
+                "arq": [{"nm": "o00406-3001500010001.logjez", "tp": "log"}],
+            }
+        ]
+    }
+
+    http_requests: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url_str = str(request.url)
+        http_requests.append(url_str)
+        if url_str.endswith("cs.json"):
+            return httpx.Response(200, content=orjson.dumps(cs_data))
+        if url_str.endswith("aux.json"):
+            return httpx.Response(200, content=orjson.dumps(aux_data))
+        if url_str.endswith(".logjez"):
+            return httpx.Response(200, content=fake_log)
+        return httpx.Response(404)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    provider = CdnArtifactProvider(
+        base_run_cfg,
+        settings,
+        mock_tz_catalog,
+        http_client=client,
+    )
+
+    items = [item async for item in provider.stream_uf("PE")]
+    assert len(items) == 2
+
+    # Seção agregada emitida sem requisição HTTP para a seção 2
+    agg_item = next(
+        i for i in items if isinstance(i, UnprocessedSectionError) and i.secao == 2
+    )
+    assert agg_item.error_code == "MISSING_LOG"
+    assert "agregada na seção principal 0001" in agg_item.error_message
+    assert agg_item.attempt_count == 0
+
+    # Certificar que nenhuma requisição aux.json foi disparada para a seção 2
+    assert not any("-s0002-aux.json" in u for u in http_requests)
+
+    # Seção principal emitida com sucesso
+    main_bundle = next(
+        i for i in items if isinstance(i, SectionArtifactBundle) and i.secao == 1
+    )
+    assert main_bundle.secao == 1
+
+    await client.aclose()
