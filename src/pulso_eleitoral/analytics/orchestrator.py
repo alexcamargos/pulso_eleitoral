@@ -20,10 +20,12 @@ import asyncio
 import logging
 from concurrent.futures import Executor, ProcessPoolExecutor
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pulso_eleitoral.analytics.parquet_writer import ParquetBatchWriter
 from pulso_eleitoral.config import ElectionRunConfig, PipelineSettings, SourceMode
+from pulso_eleitoral.contracts.exceptions import ErrorCode
 from pulso_eleitoral.contracts.models import (
     IngestionCheckpoint,
     ParsedSectionMetrics,
@@ -260,19 +262,62 @@ class PipelineOrchestrator:
                 ) -> ParsedSectionMetrics | UnprocessedSectionError:
                     try:
                         if pool is not None:
-                            res = await loop.run_in_executor(
-                                pool,
-                                _parse_bundle_worker,
-                                b,
-                                self._settings.resources_dir,
-                                profile_name,
-                            )
-                            return res
+                            try:
+                                res = await loop.run_in_executor(
+                                    pool,
+                                    _parse_bundle_worker,
+                                    b,
+                                    self._settings.resources_dir,
+                                    profile_name,
+                                )
+                                return res
+                            except Exception as pool_exc:
+                                logger.warning(
+                                    "Falha no worker pool para seção %s/%s/%s: %s. "
+                                    "Executando fallback local.",
+                                    b.uf,
+                                    b.zona,
+                                    b.secao,
+                                    pool_exc,
+                                )
+                                return _parse_bundle_worker(
+                                    b,
+                                    self._settings.resources_dir,
+                                    profile_name,
+                                )
                         # Execução no processo local (1 worker)
                         return _parse_bundle_worker(
                             b,
                             self._settings.resources_dir,
                             profile_name,
+                        )
+                    except Exception as fatal_exc:
+                        logger.error(
+                            "Erro irrecuperável no parsing da seção %s/%s/%s: %s",
+                            b.uf,
+                            b.zona,
+                            b.secao,
+                            fatal_exc,
+                        )
+                        return UnprocessedSectionError(
+                            ano_eleicao=b.ano_eleicao,
+                            turno=b.turno,
+                            pleito_id=b.pleito_id,
+                            uf=b.uf,
+                            municipio_cod=b.municipio_cod,
+                            municipio_ibge=b.municipio_ibge,
+                            municipio_nome=b.municipio_nome,
+                            zona=b.zona,
+                            secao=b.secao,
+                            fuso_horario_offset_brt=b.fuso_horario_offset_brt,
+                            cutoff_mode=b.cutoff_mode,
+                            error_code=ErrorCode.PARSE_ERROR.value,
+                            error_message=(
+                                f"Falha de parsing irrecuperável: {fatal_exc}"
+                            ),
+                            recorded_at=datetime.now(UTC).replace(tzinfo=None),
+                            source_uri=b.source_uri,
+                            attempt_count=1,
                         )
                     finally:
                         sem.release()
