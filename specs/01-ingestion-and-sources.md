@@ -21,22 +21,27 @@ Utilizado durante e logo após a apuração ou para auditoria seletiva por UF/Mu
      `https://resultados.tse.jus.br/oficial/ele{ano}/arquivo-urna/{pleito_id}/dados/{uf_lower}/{mun_5dig}/{zona_4dig}/{secao_4dig}/{hash_dir}/{nome_arquivo}`
 2. **Regras de Formatação de Parâmetros:**
    - `uf_lower`: Sigla da UF em minúsculas (`ac`, `am`, `sp`, ..., `zz` para exterior quando aplicável; por padrão o escopo nacional compreende as 27 UFs domésticas).
-   - `pleito_6dig`: Código do pleito com zero-padding de 6 dígitos (ex.: `000406`).
+   - `pleito_6dig`: Código canônico do pleito (`cd_pleito`) com zero-padding de 6 dígitos (ex.: `000406` para 2022 1T, `000407` para 2022 2T, `000452` para 2024 1T, `000453` para 2024 2T, `003220` para 2026 1T, `003221` para 2026 2T). O pipeline mapeia automaticamente identificadores de eleição federais informados por engano (ex.: `6257->3220`, `6258->3221`, `456->452`, `457->453`).
    - `mun_5dig`: Código TSE do município com 5 dígitos (`00001` a `99999`, zero-padded à esquerda).
    - `zona_4dig` / `secao_4dig`: Inteiros formatados com 4 dígitos (`0001` a `9999`).
-3. **Resolução de Múltiplos Logs na Mesma Seção:**
-   - O arquivo `-aux.json` contém o array `hashes[]`, onde cada objeto lista `st` (status), `ds` (data/hora), `hash` (identificador do subdiretório) e `nmarq[]` (lista de arquivos daquela mídia/urna, acompanhados ou validáveis por `SHA-512`).
+3. **Resolução de Múltiplos Logs na Mesma Seção e Suporte a `nmarq[]` / `arq[]`:**
+   - O arquivo `-aux.json` contém o array `hashes[]`, onde cada objeto lista `st` (status), `ds`/`dr` (data), `hash` (identificador do subdiretório) e uma lista de arquivos que pode constar sob a chave `nmarq[]` (ciclos anteriores) ou `arq[]` contendo objetos `{nm: str, tp: str}` (ciclo 2026).
+   - O artefato de log pode ser nomeado `*.logjez`, `*.jez` ou `*-log.jez` (`tp == 'log'`). O Boletim de Urna pode ser nomeado `*.bu` ou `*-bu.dat` (`tp == 'bu'`).
    - Caso haja mais de um `.logjez` na seção (substituição por urna de contingência), **todos** os arquivos `.logjez` listados devem ser baixados e entregues ordenados no `SectionArtifactBundle` para fusão e deduplicação pelo `agent-parser`.
 
 ### 1.2. Modo B: Pacotes ZIP Estaduais de Dados Abertos (`BulkZipArtifactProvider`)
 Utilizado para reprocessamento nacional offline/batch de alta velocidade sem realizar centenas de milhares de requisições HTTP individuais.
 
-1. **Nomenclatura Padrão:**
-   `bu_imgbu_logjez_rdv_vscmr_{ano}_{turno}t_{UF}.zip` (hospedado em `dadosabertos.tse.jus.br` ou diretório local pré-baixado).
-2. **Restrição Crítica de Memória (`<= 8 GB RAM`):**
+1. **Nomenclatura Padrão e URL no Portal de Dados Abertos:**
+   `bu_imgbu_logjez_rdv_vscmr_{ano}_{turno}t_{UF}.zip`, localizado no repositório de totalização do TSE:
+   `https://cdn.tse.jus.br/estatistica/sead/eleicoes/eleicoes{ano}/arqurnatot/bu_imgbu_logjez_rdv_vscmr_{ano}_{turno}t_{UF}.zip`.
+2. **Nomenclatura Interna de Membros nos Pacotes ZIP Estaduais:**
+   - **Padrão Ciclos <= 2022:** `o{pleito}-{mun_5dig}{zona_4dig}{secao_4dig}.{ext}` (extensões: `.logjez`, `.bu`, `.imgbu`, `.rdv`, `.vscmr`).
+   - **Padrão Ciclos >= 2024:** `o{pleito}{uf}{mun_5dig}{zona_4dig}{secao_4dig}-{tipo}.{ext}` (ex.: `o03220ac0107400040385-log.jez`, `o03220ac0107400040385-bu.dat`).
+3. **Restrição Crítica de Memória (`<= 8 GB RAM`):**
    - Um pacote estadual (ex.: `SP` ou `MG`) pode ultrapassar **30 GB a 45 GB**. É **estritamente proibido** ler o arquivo `.zip` estadual inteiro para `io.BytesIO`.
-   - Para arquivo local: iterar sobre `zipfile.ZipFile(path, mode="r").infolist()`, agrupando entradas por chave `(mun_5dig, zona_4dig, secao_4dig)` extraída do nome do arquivo (`o{pleito_5dig}-{mun_5dig}{zona_4dig}{secao_4dig}.logjez` e `.bu`), lendo para memória (`zf.read(info)`) **apenas** os bytes dos membros da seção corrente (~100 KB) e descartando entradas `.imgbu`, `.rdv` e `.vscmr`.
-   - Para URL remota com suporte a `Accept-Ranges: bytes`: utilizar leitura do *Central Directory* via requisições HTTP `Range` ou download em *stream* para arquivo temporário paginado por UF antes da extração seletiva.
+   - Para arquivo local: iterar sobre `zipfile.ZipFile(path, mode="r").infolist()`, agrupando entradas por chave `(mun_5dig, zona_4dig, secao_4dig)`, lendo para memória (`zf.read(info)`) **apenas** os bytes dos membros da seção corrente (~100 KB) e descartando entradas `.imgbu`, `.rdv` e `.vscmr`.
+   - Para URL remota: download em *stream* para arquivo temporário paginado por UF antes da extração seletiva (ou leitura via HTTP `Range` quando viável). Caso o pacote ZIP retorne HTTP 404 em pleito recente cujos consolidados ainda não foram gerados pelo TSE, orientar explicitamente o uso do `--source cdn`.
 
 ---
 
@@ -53,6 +58,8 @@ Utilizado para reprocessamento nacional offline/batch de alta velocidade sem rea
   - Fórmula de espera na tentativa $k \in \{1, \dots, 5\}$:
     $$t_k = \text{Uniform}\left(0, \min\left(60.0, 0.5 \times 2^k\right)\right) \text{ segundos}$$
   - Erros HTTP `404` definitivos no `.logjez` (após manifesto indicar existência da seção) não sofrem retry infinito: são classificados imediatamente como `MISSING_LOG`.
+  - Erros HTTP `404` no catálogo estadual `-cs.json` do CDN indicam que o ciclo eleitoral foi desativado/arquivado na infraestrutura de resultados ao vivo do TSE (devendo ser auditado via `--source zip`), ou que o `pleito_id` informado está incorreto.
+  - Erros HTTP `404` no download de pacotes ZIP estaduais remotos em pleitos recém-realizados indicam que os pacotes consolidados de dados abertos ainda não foram disponibilizados pelo TSE, devendo o usuário recorrer ao `--source cdn`.
 
 ### 2.2. Verificação Criptográfica (`SHA-512`)
 - Quando o manifesto fornecer hash `SHA-512` (ou `SHA-256`) esperado para o artefato:

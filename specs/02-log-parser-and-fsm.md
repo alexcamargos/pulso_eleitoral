@@ -107,7 +107,7 @@ stateDiagram-v2
 ## 5. Reconciliação com Boletim de Urna (`.bu`) (`REQ-PAR-03`)
 
 Quando `SectionArtifactBundle.bu_raw_bytes` estiver presente:
-1. Decodificar a estrutura `EntidadeBoletimUrna` (ASN.1 BER compilado via `asn1tools` a partir do schema versionado em `resources/asn1/bu_tse.asn1`, com fallback TLV BER resiliente em memória) para extrair os contadores de cabeçalho (`qtdEleitoresAptos`, `qtdComparecimento` máximo entre cargos em disputa na seção).
+1. Decodificar a estrutura `EntidadeBoletimUrna` (envelopada ou não em `EntidadeEnvelopeGenerico`, decodificada via `asn1tools` com fallback por leitor de tags TLV BER recursivo) para extrair os contadores oficiais (`qtdEleitoresAptos` e `qtdComparecimento` máximo entre cargos em disputa na seção, suportando campos `tipoCargo` em tag `0x0A` ENUMERATED ou `0x02` INTEGER e estruturas com inteiros intermediários de seção/presentes).
 2. Preencher `total_aptos` (priorizando o valor do `.bu`, com fallback para `total_aptos_manifest` ou linha de abertura do `logd.dat`).
 3. Preencher `comparecimento_bu` e calcular `divergencia_bu_log = comparecimento_bu - total_votos`.
 4. Qualquer falha isolada no parser do `.bu` não invalida o resultado do `logd.dat` (deixa `comparecimento_bu = None` e registra warning estruturado).
