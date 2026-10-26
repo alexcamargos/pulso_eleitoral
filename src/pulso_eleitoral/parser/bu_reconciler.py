@@ -287,39 +287,44 @@ def _try_decode_with_ber_tlv_walker(bu_raw_bytes: bytes) -> BuReconciliationData
         if not children:
             continue
 
-        # Padrao ResultadoVotacaoPorEleicao: [INTEGER id, INTEGER aptos, SEQUENCE]
+        # Padrao ResultadoVotacaoPorEleicao: [INTEGER id, INTEGER aptos, ..., SEQUENCE OF ResultadoVotacao]
         if (
             len(children) >= 3
             and children[0][0] == 0x02
             and children[1][0] == 0x02
-            and children[2][1]
         ):
             id_eleicao = _decode_non_negative_int(children[0][2])
             aptos = _decode_non_negative_int(children[1][2])
-            sub_items = _parse_ber_children(children[2][2])
             if (
                 id_eleicao is not None
                 and aptos is not None
                 and 1 <= aptos <= 10_000
-                and sub_items
             ):
                 matched_comps: list[int] = []
-                for _, sub_const, sub_val in sub_items:
-                    if not sub_const:
+                for _, is_const, seq_val in children[2:]:
+                    if not is_const:
                         continue
-                    rv_fields = _parse_ber_children(sub_val)
-                    if (
-                        rv_fields
-                        and len(rv_fields) >= 2
-                        and rv_fields[0][0] in (0x02, 0x0A)
-                        and rv_fields[1][0] == 0x02
-                    ):
-                        comp = _decode_non_negative_int(rv_fields[1][2])
-                        if comp is not None and 0 <= comp <= aptos:
-                            matched_comps.append(comp)
+                    sub_items = _parse_ber_children(seq_val)
+                    if not sub_items:
+                        continue
+                    for _, sub_const, sub_val in sub_items:
+                        if not sub_const:
+                            continue
+                        rv_fields = _parse_ber_children(sub_val)
+                        if (
+                            rv_fields
+                            and len(rv_fields) >= 2
+                            and rv_fields[0][0] in (0x02, 0x0A)
+                            and rv_fields[1][0] == 0x02
+                        ):
+                            comp = _decode_non_negative_int(rv_fields[1][2])
+                            if comp is not None and 0 <= comp <= aptos:
+                                matched_comps.append(comp)
+                    if matched_comps:
+                        aptos_candidates.append(aptos)
+                        comp_candidates.extend(matched_comps)
+                        break
                 if matched_comps:
-                    aptos_candidates.append(aptos)
-                    comp_candidates.extend(matched_comps)
                     continue
 
         for tag, is_const, val in children:
