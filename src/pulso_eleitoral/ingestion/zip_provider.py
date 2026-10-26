@@ -44,8 +44,11 @@ from pulso_eleitoral.ingestion.base import build_ingestion_error
 from pulso_eleitoral.ingestion.timezone import TimezoneCatalog
 
 _MEMBER_FILENAME_RE: re.Pattern[str] = re.compile(
-    r"^o(?P<pleito>\d{5,6})-(?P<mun>\d{5})(?P<zona>\d{4})(?P<secao>\d{4})"
-    r"(?:[-_][A-Za-z0-9]+)*\.(?P<ext>logjez|jez|bu|imgbu|rdv|vscmr)$",
+    r"^o(?P<pleito>\d{5,6})"
+    r"(?:[-_]|(?:[a-zA-Z]{2}))?"
+    r"(?P<mun>\d{5})(?P<zona>\d{4})(?P<secao>\d{4})"
+    r"(?:[-_](?P<tipo>[A-Za-z0-9]+))*"
+    r"\.(?P<ext>[A-Za-z0-9]+)$",
     re.IGNORECASE,
 )
 
@@ -191,7 +194,12 @@ class BulkZipArtifactProvider:
         """
         filename = self.build_zip_filename(uf)
         base_url = self._settings.open_data_base_url.rstrip("/")
-        url = f"{base_url}/{self._run_cfg.ano_eleicao}/{filename}"
+        if "arqurnatot" in base_url:
+            url = f"{base_url}/{filename}"
+        elif f"eleicoes{self._run_cfg.ano_eleicao}" in base_url:
+            url = f"{base_url}/arqurnatot/{filename}"
+        else:
+            url = f"{base_url}/eleicoes{self._run_cfg.ano_eleicao}/arqurnatot/{filename}"
 
         owns_client = self._http_client is None
         client = self._http_client or httpx.AsyncClient(
@@ -222,7 +230,10 @@ class BulkZipArtifactProvider:
                     raise HttpExhaustedError(
                         f"Pacote ZIP estadual '{filename}' não encontrado "
                         f"{local_info}no portal de dados abertos do TSE "
-                        f"(HTTP {response.status_code}: {url}).",
+                        f"(HTTP {response.status_code}: {url}). "
+                        "Atenção: Para pleitos recentes ou segundo turno recém-realizado, os pacotes "
+                        "consolidados de dados abertos podem ainda não ter sido publicados pelo TSE. "
+                        "Utilize '--source cdn' para auditar diretamente via CDN oficial de resultados.",
                         source_uri=url,
                         attempt_count=1,
                     )
@@ -344,11 +355,12 @@ class BulkZipArtifactProvider:
                     continue
 
                 ext = match.group("ext").lower()
+                tipo = (match.group("tipo") or "").lower()
                 bucket = grouped[(mun_cod, zona, secao)]
                 bucket.has_any_artifact = True
-                if ext in ("logjez", "jez"):
+                if ext in ("logjez", "jez") or tipo in ("log", "logjez"):
                     bucket.log_infos.append(info)
-                elif ext == "bu":
+                elif (ext == "bu" or tipo == "bu") and ext != "jez":
                     bucket.bu_infos.append(info)
 
             for idx, (section_key, members) in enumerate(sorted(grouped.items())):
