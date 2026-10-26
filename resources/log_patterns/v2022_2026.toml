@@ -1,0 +1,71 @@
+# Perfil oficial de padroes de eventos do logd.dat para ciclos unificados (UE2022, UE2024, UE2026)
+# Especificacao de referencia: specs/02-log-parser-and-fsm.md Secao 3 (REQ-PAR-02)
+
+profile_id = "v2022_2026"
+description = "Padroes canonicos do subsistema VOTA e GAP para eleicoes 2022 a 2026"
+encoding = "latin-1"
+case_insensitive = true
+vota_app_tokens = ["VOTA", "GAP", "RED", "SCUE"]
+
+[events]
+VOTING_OPENED = [
+    "Urna pronta para receber votos",
+    "In[ií]cio da vota[cç][aã]o",
+]
+
+VOTER_SESSION_START = [
+    "Aguardando digita[cç][aã]o do (?:t[ií]tulo|identificador)",
+    "(?:T[ií]tulo|Identificador do eleitor) digitado pelo mes[aá]rio",
+]
+
+BIO_SUCCESS = [
+    "Tipo de habilita[cç][aã]o do eleitor \\[biom[eé]trica\\]",
+    "Habilita[cç][aã]o do eleitor por biometria",
+    "Biometria do eleitor reconhecida",
+    "Eleitor habilitado por biometria",
+]
+
+BIO_FAIL = [
+    "Tentativa de identifica[cç][aã]o biom[eé]trica falhou",
+    "Digital n[aã]o reconhecida",
+    "N[aã]o foi poss[ií]vel reconhecer a digital",
+]
+
+BIO_BYPASS = [
+    "Tipo de habilita[cç][aã]o do eleitor \\[(?:manual|biogr[aá]fica)\\]",
+    "Habilita[cç][aã]o manual sem biometria",
+    "Mes[aá]rio habilitou o eleitor sem biometria",
+    "Solicita[cç][aã]o de dado pessoal do eleitor para habilita[cç][aã]o",
+    "Eleitor sem biometria cadastrada",
+]
+
+VOTER_ENABLED = [
+    "Eleitor foi habilitado",
+]
+
+VOTE_CONFIRMED = [
+    "O voto do eleitor foi computado",
+    "Voto do eleitor computado",
+]
+
+VOTER_ABORTED = [
+    "Vota[cç][aã]o cancelada",
+    "Suspens[aã]o de voto",
+    "Eleitor suspenso(?: pelo mes[aá]rio)?",
+    "Cancelamento de habilita[cç][aã]o",
+]
+
+SYSTEM_REBOOT = [
+    "Inicializando aplica[cç][aã]o",
+    "Urna ligada",
+    "Rein[ií]cio do sistema",
+]
+
+SECTION_CLOSED = [
+    "Encerramento da se[cç][aã]o eleitoral",
+    "Vota[cç][aã]o encerrada",
+    "Emiss[aã]o do boletim de urna",
+]
+
+[metadata]
+eleitores_aptos = "Eleitores aptos[^0-9]*([0-9]+)"

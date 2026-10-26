@@ -1,0 +1,61 @@
+-- Especificacao ASN.1 compativel em nivel BER com o Boletim de Urna do TSE
+-- Referencia: specs/02-log-parser-and-fsm.md Secao 5 (REQ-PAR-03)
+
+ModuloBU DEFINITIONS IMPLICIT TAGS ::= BEGIN
+
+CabecalhoEntidade ::= SEQUENCE {
+    dataGeracao GeneralString,
+    idEleitoral [0] INTEGER OPTIONAL
+}
+
+MunicipioZona ::= SEQUENCE {
+    municipio INTEGER (1..99999),
+    zona      INTEGER (1..9999)
+}
+
+IdentificacaoSecaoEleitoral ::= SEQUENCE {
+    municipioZona MunicipioZona,
+    local         INTEGER (1..9999),
+    secao         INTEGER (1..9999)
+}
+
+TipoEnvelope ::= ENUMERATED {
+    envelopeBoletimUrnaImpresso (1),
+    envelopeBoletimUrna         (2),
+    envelopeRegistroDigitalVoto (4),
+    envelopeUrna                (5)
+}
+
+EntidadeEnvelopeGenerico ::= SEQUENCE {
+    cabecalho     CabecalhoEntidade,
+    fase          INTEGER,
+    urna          [0] OCTET STRING OPTIONAL,
+    identificacao IdentificacaoSecaoEleitoral,
+    tipoEnvelope  TipoEnvelope,
+    seguranca     [1] OCTET STRING OPTIONAL,
+    conteudo      OCTET STRING
+}
+
+ResultadoVotacao ::= SEQUENCE {
+    tipoCargo         INTEGER,
+    qtdComparecimento INTEGER (0..99999),
+    totaisVotosCargo  [0] OCTET STRING OPTIONAL
+}
+
+ResultadoVotacaoPorEleicao ::= SEQUENCE {
+    idEleicao         INTEGER,
+    qtdEleitoresAptos INTEGER (0..99999),
+    resultadosVotacao SEQUENCE OF ResultadoVotacao
+}
+
+EntidadeBoletimUrna ::= SEQUENCE {
+    cabecalho                    CabecalhoEntidade,
+    fase                         INTEGER,
+    identificacaoSecao           IdentificacaoSecaoEleitoral,
+    dataHoraEmissao              GeneralString,
+    qtdEleitoresLibCodigo        [1] INTEGER (0..99999) OPTIONAL,
+    qtdEleitoresCompBiometrico   [2] INTEGER (0..99999) OPTIONAL,
+    resultadosVotacaoPorEleicao  [3] SEQUENCE OF ResultadoVotacaoPorEleicao
+}
+
+END
