@@ -86,3 +86,34 @@ def test_cli_main_entrypoint_invokes_typer_app(mocker: MockerFixture) -> None:
     mocked_app = mocker.patch.object(cli_module, "app")
     cli_module.main()
     mocked_app.assert_called_once_with()
+
+
+def test_cli_pleito_resolution_and_aliases() -> None:
+    """Verifica resolução de pleitos canônicos e mapeamento de códigos de eleição.
+
+    Args:
+        Nenhum.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+    # Defaults de 2026
+    assert cli_module._resolve_default_pleito_id(2026, 1) == 3220
+    assert cli_module._resolve_default_pleito_id(2026, 2) == 3221
+
+    # Defaults de 2024
+    assert cli_module._resolve_default_pleito_id(2024, 1) == 452
+    assert cli_module._resolve_default_pleito_id(2024, 2) == 453
+
+    # Tolerância a código de eleição informado na linha de comando
+    assert cli_module._resolve_target_pleito_id(2026, 2, 6258) == 3221
+    assert cli_module._resolve_target_pleito_id(2026, 1, 6257) == 3220
+    assert cli_module._resolve_target_pleito_id(2024, 1, 456) == 452
+    assert cli_module._resolve_target_pleito_id(2024, 2, 457) == 453
+
+    # Pleito explícito não alterado quando já canônico
+    assert cli_module._resolve_target_pleito_id(2026, 2, 3221) == 3221
+    assert cli_module._resolve_target_pleito_id(2022, 2, 407) == 407

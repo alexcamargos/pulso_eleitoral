@@ -89,6 +89,27 @@ def test_election_run_config_accepts_empty_sequence_as_all_domestic_ufs() -> Non
     assert cfg.ufs == DOMESTIC_UFS
 
 
+def test_election_run_config_resolves_2026_pleitos() -> None:
+    """Verifica resolução automática de datas para pleitos de 2026 (3220 e 3221).
+
+    Args:
+        Nenhum.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+    cfg_1t = ElectionRunConfig(ano_eleicao=2026, turno=1, pleito_id=3220, ufs="ALL")
+    assert cfg_1t.election_date_iso == "2026-10-04"
+    assert cfg_1t.cutoff_mode == CutoffMode.UNIFIED_BRT
+
+    cfg_2t = ElectionRunConfig(ano_eleicao=2026, turno=2, pleito_id=3221, ufs="ALL")
+    assert cfg_2t.election_date_iso == "2026-10-25"
+    assert cfg_2t.cutoff_mode == CutoffMode.UNIFIED_BRT
+
+
 @pytest.mark.parametrize(
     ("kwargs", "match_msg"),
     [

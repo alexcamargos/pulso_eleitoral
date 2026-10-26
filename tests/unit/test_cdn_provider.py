@@ -407,3 +407,81 @@ async def test_cdn_provider_skips_checkpoint(
     assert len(results) == 0
     assert aux_called is False
     await client.aclose()
+
+
+def test_cdn_provider_extracts_aux_targets_2026_arq_format() -> None:
+    """Verifica extração de alvos .log.jez e .bu.dat usando formato 'arq' do ciclo 2026.
+
+    Args:
+        Nenhum.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+    aux_payload = {
+        "dg": "25/10/2026",
+        "hg": "20:31:31",
+        "hashes": [
+            {
+                "hash": "test_hash_dir",
+                "arq": [
+                    {"nm": "o03221ac0107400040001-rdv.dat", "tp": "rdv"},
+                    {"nm": "o03221ac0107400040001-vota.vsc", "tp": "vota"},
+                    {"nm": "o03221ac0107400040001-bu.dat", "tp": "bu"},
+                    {"nm": "o03221ac0107400040001-log.jez", "tp": "log"},
+                ],
+            }
+        ],
+    }
+    raw_bytes = orjson.dumps(aux_payload)
+    _aptos, log_targets, bu_targets = CdnArtifactProvider._extract_aux_targets(
+        raw_bytes,
+        "https://resultados.tse.jus.br/test-aux.json",
+    )
+    assert len(log_targets) == 1
+    assert log_targets[0][0] == "test_hash_dir"
+    assert log_targets[0][1] == "o03221ac0107400040001-log.jez"
+
+    assert len(bu_targets) == 1
+    assert bu_targets[0][0] == "test_hash_dir"
+    assert bu_targets[0][1] == "o03221ac0107400040001-bu.dat"
+
+
+@pytest.mark.asyncio
+async def test_cdn_provider_cs_url_404_informative_message(
+    base_run_cfg: ElectionRunConfig,
+    mock_tz_catalog: TimezoneCatalog,
+) -> None:
+    """Confirma erro explicativo indicando '--source zip' quando índice é 404.
+
+    Args:
+        base_run_cfg: Configuração da eleição.
+        mock_tz_catalog: Catálogo de fusos.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+    settings = PipelineSettings()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    provider = CdnArtifactProvider(
+        base_run_cfg,
+        settings,
+        mock_tz_catalog,
+        http_client=client,
+    )
+
+    with pytest.raises(Exception, match="Índice estadual") as exc_info:
+        _ = [item async for item in provider.stream_uf("PE")]
+
+    assert "--source zip" in str(exc_info.value)
+    await client.aclose()

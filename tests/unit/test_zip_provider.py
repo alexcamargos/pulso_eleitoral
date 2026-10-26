@@ -295,3 +295,98 @@ async def test_bulk_zip_provider_remote_stream_download(
     assert isinstance(results[0], SectionArtifactBundle)
     assert results[0].secao == 101
     await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_bulk_zip_provider_matches_2026_member_names(
+    tmp_path: Path,
+    mock_tz_catalog: TimezoneCatalog,
+) -> None:
+    """Verifica extração com nomes de membros no padrão 2026 (-log.jez / -bu.dat).
+
+    Args:
+        tmp_path: Diretório temporário fornecido pelo pytest.
+        mock_tz_catalog: Catálogo simulado de fusos horários.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+    settings = PipelineSettings(data_dir=tmp_path / "data")
+    run_cfg_2026 = ElectionRunConfig(
+        ano_eleicao=2026,
+        turno=1,
+        pleito_id=3220,
+        election_date_iso="2026-10-04",
+        ufs=("SP",),
+    )
+
+    mem_zip = io.BytesIO()
+    with zipfile.ZipFile(mem_zip, "w") as zf:
+        zf.writestr("o03220sp7107200010101-log.jez", b"2026 log content")
+        zf.writestr("o03220sp7107200010101-bu.dat", b"2026 bu content")
+        zf.writestr("o03220sp7107200010101-imgbu.dat", b"image content")
+    zip_bytes = mem_zip.getvalue()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=zip_bytes)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    provider = BulkZipArtifactProvider(
+        run_cfg_2026,
+        settings,
+        mock_tz_catalog,
+        http_client=client,
+        allow_remote_download=True,
+    )
+
+    results = [item async for item in provider.stream_uf("SP")]
+    assert len(results) == 1
+    assert isinstance(results[0], SectionArtifactBundle)
+    assert results[0].secao == 101
+    assert len(results[0].log_artifacts) == 1
+    assert results[0].log_artifacts[0].filename == "o03220sp7107200010101-log.jez"
+    assert results[0].bu_raw_bytes == b"2026 bu content"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_bulk_zip_provider_remote_404_advises_cdn(
+    tmp_path: Path,
+    mock_tz_catalog: TimezoneCatalog,
+    base_run_cfg: ElectionRunConfig,
+) -> None:
+    """Verifica mensagem orientando '--source cdn' quando o ZIP remoto for 404.
+
+    Args:
+        tmp_path: Diretório temporário fornecido pelo pytest.
+        mock_tz_catalog: Catálogo simulado de fusos horários.
+        base_run_cfg: Configuração padrão da eleição.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+    settings = PipelineSettings(data_dir=tmp_path / "data")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    provider = BulkZipArtifactProvider(
+        base_run_cfg,
+        settings,
+        mock_tz_catalog,
+        http_client=client,
+        allow_remote_download=True,
+    )
+
+    with pytest.raises(Exception, match="não encontrado") as exc_info:
+        _ = [item async for item in provider.stream_uf("SP")]
+
+    assert "--source cdn" in str(exc_info.value)
+    await client.aclose()
