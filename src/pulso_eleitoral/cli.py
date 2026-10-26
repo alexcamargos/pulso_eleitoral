@@ -88,11 +88,35 @@ def cli_root(
     _ = version
 
 
+def _resolve_default_pleito_id(ano: int, turno: int) -> int:
+    """Resolve o ID canônico do pleito federal caso não seja especificado.
+
+    Args:
+        ano: Ano da eleição.
+        turno: Turno da eleição (1 ou 2).
+
+    Returns:
+        ID inteiro do pleito no TSE.
+
+    Raises:
+        Nenhum.
+    """
+    if ano == 2026:
+        return 6257 if turno == 1 else 6258
+    if ano == 2024:
+        return 456 if turno == 1 else 457
+    if ano == 2020:
+        return 304 if turno == 1 else 305
+    return 406 if turno == 1 else 407
+
+
 @app.command("ingest-parse")
 def ingest_parse(
     ano: Annotated[int, typer.Option("--ano", help="Ano oficial da eleição.")] = 2022,
     turno: Annotated[int, typer.Option("--turno", help="Turno (1 ou 2).")] = 1,
-    pleito: Annotated[int, typer.Option("--pleito", help="ID do pleito TSE.")] = 406,
+    pleito: Annotated[
+        int | None, typer.Option("--pleito", help="ID do pleito TSE.")
+    ] = None,
     uf: Annotated[str, typer.Option("--uf", help="Sigla da UF ou ALL.")] = "ALL",
     municipio: Annotated[
         str | None,
@@ -135,13 +159,16 @@ def ingest_parse(
         typer.Exit: Caso a execução falhe.
     """
     try:
+        resolved_pleito = (
+            pleito if pleito is not None else _resolve_default_pleito_id(ano, turno)
+        )
         mun_tuple: tuple[int, ...] = ()
         if municipio:
             mun_tuple = tuple(int(x.strip()) for x in municipio.split(",") if x.strip())
         run_cfg = ElectionRunConfig(
             ano_eleicao=ano,
             turno=turno,
-            pleito_id=pleito,
+            pleito_id=resolved_pleito,
             ufs=(uf,),
             municipios=mun_tuple,
             source_mode=source,
@@ -219,7 +246,9 @@ def consolidate(
 def export_json(
     ano: Annotated[int, typer.Option("--ano", help="Ano oficial da eleição.")] = 2022,
     turno: Annotated[int, typer.Option("--turno", help="Turno (1 ou 2).")] = 1,
-    pleito: Annotated[int, typer.Option("--pleito", help="ID do pleito TSE.")] = 406,
+    pleito: Annotated[
+        int | None, typer.Option("--pleito", help="ID do pleito TSE.")
+    ] = None,
     db_path: Annotated[
         Path,
         typer.Option("--db-path", help="Caminho do banco analítico DuckDB."),
@@ -245,10 +274,13 @@ def export_json(
         typer.Exit: Caso ocorra falha na exportação.
     """
     try:
+        resolved_pleito = (
+            pleito if pleito is not None else _resolve_default_pleito_id(ano, turno)
+        )
         run_cfg = ElectionRunConfig(
             ano_eleicao=ano,
             turno=turno,
-            pleito_id=pleito,
+            pleito_id=resolved_pleito,
             ufs=("ALL",),
         )
         settings = PipelineSettings(db_path=db_path)
@@ -306,7 +338,9 @@ def verify(
 def run_all(
     ano: Annotated[int, typer.Option("--ano", help="Ano oficial da eleição.")] = 2022,
     turno: Annotated[int, typer.Option("--turno", help="Turno (1 ou 2).")] = 1,
-    pleito: Annotated[int, typer.Option("--pleito", help="ID do pleito TSE.")] = 406,
+    pleito: Annotated[
+        int | None, typer.Option("--pleito", help="ID do pleito TSE.")
+    ] = None,
     uf: Annotated[str, typer.Option("--uf", help="Sigla da UF ou ALL.")] = "ALL",
     municipio: Annotated[
         str | None,
@@ -358,12 +392,17 @@ def run_all(
     Raises:
         typer.Exit: Caso alguma etapa falhe.
     """
-    typer.echo(f"[pulso pipeline] Iniciando execução completa para pleito {pleito}...")
+    resolved_pleito = (
+        pleito if pleito is not None else _resolve_default_pleito_id(ano, turno)
+    )
+    typer.echo(
+        f"[pulso pipeline] Iniciando execução completa para pleito {resolved_pleito}..."
+    )
     # 1. Ingest-Parse
     ingest_parse(
         ano=ano,
         turno=turno,
-        pleito=pleito,
+        pleito=resolved_pleito,
         uf=uf,
         municipio=municipio,
         source=source,
@@ -374,7 +413,13 @@ def run_all(
     # 2. Consolidate
     consolidate(ano=ano, turno=turno, db_path=db_path)
     # 3. Export JSON
-    export_json(ano=ano, turno=turno, pleito=pleito, db_path=db_path, out_dir=out_dir)
+    export_json(
+        ano=ano,
+        turno=turno,
+        pleito=resolved_pleito,
+        db_path=db_path,
+        out_dir=out_dir,
+    )
     # 4. Verify
     target_json_dir = out_dir / f"ele{ano}" / f"turno{turno}"
     verify(db_path=db_path, json_dir=target_json_dir)

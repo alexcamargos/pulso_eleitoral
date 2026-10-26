@@ -63,6 +63,8 @@ KNOWN_PLEITO_DATES: dict[int, str] = {
     407: "2022-10-30",
     456: "2024-10-06",
     457: "2024-10-27",
+    6257: "2026-10-04",
+    6258: "2026-10-25",
 }
 
 DEFAULT_RESOURCES_DIR: Path = Path(__file__).resolve().parents[2] / "resources"
