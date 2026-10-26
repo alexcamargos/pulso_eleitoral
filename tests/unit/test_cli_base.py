@@ -51,18 +51,6 @@ def test_cli_version_and_help_commands() -> None:
 @pytest.mark.parametrize(
     "args",
     [
-        [
-            "ingest-parse",
-            "--ano",
-            "2022",
-            "--turno",
-            "1",
-            "--pleito",
-            "406",
-            "--uf",
-            "AC",
-        ],
-        ["consolidate"],
         ["export-json"],
         ["verify"],
         ["run-all"],

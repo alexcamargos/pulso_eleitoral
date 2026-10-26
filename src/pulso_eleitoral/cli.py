@@ -15,13 +15,20 @@ Raises:
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
 from pulso_eleitoral import __version__
+from pulso_eleitoral.analytics.consolidator import DuckDbConsolidator
+from pulso_eleitoral.analytics.orchestrator import PipelineOrchestrator
 from pulso_eleitoral.config import ElectionRunConfig, PipelineSettings, SourceMode
+from pulso_eleitoral.ingestion.timezone import TimezoneCatalog
+
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(
     name="pulso",
@@ -81,6 +88,10 @@ def ingest_parse(
     turno: Annotated[int, typer.Option("--turno", help="Turno (1 ou 2).")] = 1,
     pleito: Annotated[int, typer.Option("--pleito", help="ID do pleito TSE.")] = 406,
     uf: Annotated[str, typer.Option("--uf", help="Sigla da UF ou ALL.")] = "ALL",
+    municipio: Annotated[
+        str | None,
+        typer.Option("--municipio", "-m", help="Códigos TSE municipais para filtro."),
+    ] = None,
     source: Annotated[
         SourceMode,
         typer.Option("--source", help="Fonte oficial TSE (cdn ou zip)."),
@@ -105,6 +116,7 @@ def ingest_parse(
         turno: Turno da eleição (`1` ou `2`).
         pleito: Identificador numérico do pleito no TSE.
         uf: UF alvo ou `"ALL"`.
+        municipio: Filtro de municípios TSE opcional.
         source: Modo de obtenção (`cdn` ou `zip`).
         input_dir: Diretório de entrada quando `source=zip`.
         workers: Quantidade de processos paralelos.
@@ -114,24 +126,41 @@ def ingest_parse(
         Nenhum.
 
     Raises:
-        typer.Exit: Caso a configuração seja inválida ou estágio ainda não conectado.
+        typer.Exit: Caso a execução falhe.
     """
-    run_cfg = ElectionRunConfig(
-        ano_eleicao=ano,
-        turno=turno,
-        pleito_id=pleito,
-        ufs=(uf,),
-        source_mode=source,
-        force_reprocess=force,
-        input_dir=input_dir,
-    )
-    settings = PipelineSettings(workers=workers)
-    typer.echo(
-        f"[pulso] Config validada: ano={run_cfg.ano_eleicao} turno={run_cfg.turno} "
-        f"pleito={run_cfg.pleito_id} cutoff={run_cfg.cutoff_mode} "
-        f"ufs={len(run_cfg.ufs)} workers={settings.workers}"
-    )
-    raise typer.Exit(code=2)
+    try:
+        mun_tuple: tuple[int, ...] = ()
+        if municipio:
+            mun_tuple = tuple(int(x.strip()) for x in municipio.split(",") if x.strip())
+        run_cfg = ElectionRunConfig(
+            ano_eleicao=ano,
+            turno=turno,
+            pleito_id=pleito,
+            ufs=(uf,),
+            municipios=mun_tuple,
+            source_mode=source,
+            force_reprocess=force,
+            input_dir=input_dir,
+        )
+        settings = PipelineSettings(workers=workers)
+        tz_catalog = TimezoneCatalog.from_csv(
+            settings.resources_dir / "dim_municipio_fuso.csv"
+        )
+        orchestrator = PipelineOrchestrator(run_cfg, settings, tz_catalog)
+
+        async def _run_all_ufs() -> None:
+            for target_uf in run_cfg.ufs:
+                typer.echo(f"[pulso] Processando UF: {target_uf}...")
+                summary = await orchestrator.run_uf(target_uf)
+                typer.echo(
+                    f"[pulso] Concluído {summary.uf}: total={summary.total_sections} "
+                    f"sucesso={summary.success_sections} erros={summary.error_sections}"
+                )
+
+        asyncio.run(_run_all_ufs())
+    except Exception as exc:
+        typer.echo(f"[pulso erro] Falha em ingest-parse: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
 
 
 @app.command("consolidate")
@@ -142,6 +171,10 @@ def consolidate(
         Path,
         typer.Option("--db-path", help="Caminho do banco analítico DuckDB."),
     ] = Path("data/pulso_eleitoral.duckdb"),
+    data_dir: Annotated[
+        Path | None,
+        typer.Option("--data-dir", help="Diretório base de partições Parquet."),
+    ] = None,
 ) -> None:
     """Consolida partições Parquet e cria views analíticas OLAP no DuckDB.
 
@@ -149,15 +182,31 @@ def consolidate(
         ano: Ano oficial da eleição.
         turno: Turno (`1` ou `2`).
         db_path: Caminho do arquivo `.duckdb`.
+        data_dir: Diretório opcional contendo `processed/`.
 
     Returns:
         Nenhum.
 
     Raises:
-        typer.Exit: Enquanto aguarda conexão do motor OLAP na Sprint 4.
+        typer.Exit: Caso ocorra erro durante a consolidação.
     """
-    _ = (ano, turno, db_path)
-    raise typer.Exit(code=2)
+    _ = (ano, turno)
+    try:
+        resolved_data_dir = data_dir or (
+            db_path.parent if (db_path.parent / "processed").is_dir() else Path("data")
+        )
+        settings = PipelineSettings(data_dir=resolved_data_dir, db_path=db_path)
+        consolidator = DuckDbConsolidator(settings)
+        result_path = consolidator.consolidate()
+        rows = consolidator.query("SELECT COUNT(*) AS total FROM raw_section_metrics;")
+        total = rows[0]["total"] if rows else 0
+        typer.echo(
+            f"[pulso] Consolidação DuckDB concluída com sucesso em {result_path} "
+            f"({total} seções registradas)."
+        )
+    except Exception as exc:
+        typer.echo(f"[pulso erro] Falha na consolidação DuckDB: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
 
 
 @app.command("export-json")
