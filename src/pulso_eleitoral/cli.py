@@ -25,7 +25,13 @@ import typer
 from pulso_eleitoral import __version__
 from pulso_eleitoral.analytics.consolidator import DuckDbConsolidator
 from pulso_eleitoral.analytics.orchestrator import PipelineOrchestrator
-from pulso_eleitoral.config import ElectionRunConfig, PipelineSettings, SourceMode
+from pulso_eleitoral.analytics.verifier import PipelineVerifier
+from pulso_eleitoral.config import (
+    ElectionRunConfig,
+    PipelineSettings,
+    SourceMode,
+)
+from pulso_eleitoral.export.exporter import StaticJsonExporter
 from pulso_eleitoral.ingestion.timezone import TimezoneCatalog
 
 logger = logging.getLogger(__name__)
@@ -213,6 +219,7 @@ def consolidate(
 def export_json(
     ano: Annotated[int, typer.Option("--ano", help="Ano oficial da eleição.")] = 2022,
     turno: Annotated[int, typer.Option("--turno", help="Turno (1 ou 2).")] = 1,
+    pleito: Annotated[int, typer.Option("--pleito", help="ID do pleito TSE.")] = 406,
     db_path: Annotated[
         Path,
         typer.Option("--db-path", help="Caminho do banco analítico DuckDB."),
@@ -227,6 +234,7 @@ def export_json(
     Args:
         ano: Ano oficial da eleição.
         turno: Turno (`1` ou `2`).
+        pleito: Identificador numérico do pleito TSE.
         db_path: Caminho do arquivo `.duckdb`.
         out_dir: Diretório raiz da API estática.
 
@@ -234,10 +242,26 @@ def export_json(
         Nenhum.
 
     Raises:
-        typer.Exit: Enquanto aguarda conexão do exportador na Sprint 5.
+        typer.Exit: Caso ocorra falha na exportação.
     """
-    _ = (ano, turno, db_path, out_dir)
-    raise typer.Exit(code=2)
+    try:
+        run_cfg = ElectionRunConfig(
+            ano_eleicao=ano,
+            turno=turno,
+            pleito_id=pleito,
+            ufs=("ALL",),
+        )
+        settings = PipelineSettings(db_path=db_path)
+        exporter = StaticJsonExporter(settings, run_cfg)
+        target_dir = out_dir / f"ele{ano}" / f"turno{turno}"
+        generated = exporter.export_all(output_dir=target_dir)
+        typer.echo(
+            f"[pulso] Exportação concluída com sucesso: {len(generated)} arquivos "
+            f"gerados em {target_dir}."
+        )
+    except Exception as exc:
+        typer.echo(f"[pulso erro] Falha na exportação JSON: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
 
 
 @app.command("verify")
@@ -247,24 +271,35 @@ def verify(
         typer.Option("--db-path", help="Caminho do banco analítico DuckDB."),
     ] = Path("data/pulso_eleitoral.duckdb"),
     json_dir: Annotated[
-        Path,
+        Path | None,
         typer.Option("--json-dir", help="Diretório dos JSONs exportados."),
-    ] = Path("frontend/public/api/v1"),
+    ] = None,
 ) -> None:
     """Executa bateria de auditoria pós-execução (invariantes e somas cruzadas).
 
     Args:
         db_path: Caminho do arquivo `.duckdb`.
-        json_dir: Diretório dos artefatos JSON gerados.
+        json_dir: Diretório opcional dos artefatos JSON gerados.
 
     Returns:
         Nenhum.
 
     Raises:
-        typer.Exit: Enquanto aguarda conexão do verificador na Sprint 5.
+        typer.Exit: Caso a verificação encontre inconsistências.
     """
-    _ = (db_path, json_dir)
-    raise typer.Exit(code=2)
+    try:
+        settings = PipelineSettings(db_path=db_path)
+        verifier = PipelineVerifier(settings)
+        report = verifier.verify_all(json_dir=json_dir)
+        typer.echo(
+            f"[pulso auditoria] SUCESSO: {report.success_sections} seções válidas, "
+            f"{report.error_sections} erros auditados. "
+            f"DuckDB={report.db_size_mb} MB (SLA <= 200 MB). "
+            f"Invariantes 1..6 e somas cruzadas 100% conformes."
+        )
+    except Exception as exc:
+        typer.echo(f"[pulso erro] Auditoria reprovada: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
 
 
 @app.command("run-all")
@@ -277,6 +312,14 @@ def run_all(
         SourceMode,
         typer.Option("--source", help="Fonte oficial TSE (cdn ou zip)."),
     ] = SourceMode.ZIP,
+    db_path: Annotated[
+        Path,
+        typer.Option("--db-path", help="Caminho do banco analítico DuckDB."),
+    ] = Path("data/pulso_eleitoral.duckdb"),
+    out_dir: Annotated[
+        Path,
+        typer.Option("--out-dir", help="Diretório base de exportação JSON."),
+    ] = Path("frontend/public/api/v1"),
 ) -> None:
     """Orquestra em sequência `ingest-parse`, `consolidate`, `export-json` e `verify`.
 
@@ -286,15 +329,26 @@ def run_all(
         pleito: Identificador numérico do pleito no TSE.
         uf: UF alvo ou `"ALL"`.
         source: Modo de obtenção (`cdn` ou `zip`).
+        db_path: Caminho do banco DuckDB.
+        out_dir: Diretório de exportação JSON.
 
     Returns:
         Nenhum.
 
     Raises:
-        typer.Exit: Enquanto aguarda conexão fim-a-fim na Sprint 5.
+        typer.Exit: Caso alguma etapa falhe.
     """
-    _ = (ano, turno, pleito, uf, source)
-    raise typer.Exit(code=2)
+    typer.echo(f"[pulso pipeline] Iniciando execução completa para pleito {pleito}...")
+    # 1. Ingest-Parse
+    ingest_parse(ano=ano, turno=turno, pleito=pleito, uf=uf, source=source)
+    # 2. Consolidate
+    consolidate(ano=ano, turno=turno, db_path=db_path)
+    # 3. Export JSON
+    export_json(ano=ano, turno=turno, pleito=pleito, db_path=db_path, out_dir=out_dir)
+    # 4. Verify
+    target_json_dir = out_dir / f"ele{ano}" / f"turno{turno}"
+    verify(db_path=db_path, json_dir=target_json_dir)
+    typer.echo("[pulso pipeline] Execução concluída e auditada com sucesso!")
 
 
 def main() -> None:
