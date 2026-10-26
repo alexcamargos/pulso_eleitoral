@@ -211,10 +211,21 @@ def ingest_parse(
             for target_uf in run_cfg.ufs:
                 typer.echo(f"[pulso] Processando UF: {target_uf}...")
                 summary = await orchestrator.run_uf(target_uf)
-                typer.echo(
-                    f"[pulso] Concluído {summary.uf}: total={summary.total_sections} "
-                    f"sucesso={summary.success_sections} erros={summary.error_sections}"
-                )
+                if summary.checkpoint_sections > 0:
+                    typer.echo(
+                        f"[pulso] Concluído {summary.uf}: "
+                        f"{summary.checkpoint_sections} em checkpoint, "
+                        f"{summary.total_sections} nesta execução "
+                        f"(sucesso={summary.success_sections} "
+                        f"erros={summary.error_sections})"
+                    )
+                else:
+                    typer.echo(
+                        f"[pulso] Concluído {summary.uf}: "
+                        f"total={summary.total_sections} "
+                        f"sucesso={summary.success_sections} "
+                        f"erros={summary.error_sections}"
+                    )
 
         asyncio.run(_run_all_ufs())
     except Exception as exc:

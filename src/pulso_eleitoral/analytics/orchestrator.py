@@ -71,10 +71,11 @@ class UfExecutionSummary:
 
     Args:
         uf: Sigla da UF em 2 letras.
-        total_sections: Total de seções avaliadas no fluxo.
+        total_sections: Total de seções avaliadas no fluxo desta execução.
         success_sections: Quantidade de seções concluídas com sucesso.
         error_sections: Quantidade de seções com erro registradas em auditoria.
         parquet_files: Caminhos das partições Parquet geradas.
+        checkpoint_sections: Quantidade de seções já consolidadas em execuções prévias.
 
     Returns:
         Nenhum.
@@ -88,6 +89,7 @@ class UfExecutionSummary:
     success_sections: int
     error_sections: int
     parquet_files: tuple[Path, ...]
+    checkpoint_sections: int = 0
 
 
 class PipelineOrchestrator:
@@ -303,10 +305,14 @@ class PipelineOrchestrator:
             if owns_executor and pool is not None:
                 pool.shutdown(wait=True)
 
+        checkpoint_count = (
+            len(checkpoint.completed_sections) if checkpoint is not None else 0
+        )
         return UfExecutionSummary(
             uf=norm_uf,
             total_sections=total_sections,
             success_sections=success_sections,
             error_sections=error_sections,
             parquet_files=tuple(written_files),
+            checkpoint_sections=checkpoint_count,
         )
