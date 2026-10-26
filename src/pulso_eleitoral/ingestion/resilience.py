@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import random
 import time
+from collections.abc import Awaitable, Callable
 from enum import StrEnum
 
 RETRYABLE_STATUS_CODES: frozenset[int] = frozenset({408, 429, 500, 502, 503, 504})
@@ -77,12 +78,63 @@ def compute_full_jitter_delay(
     return jitter_delay
 
 
+def compute_rate_limit_delay(
+    attempt: int,
+    *,
+    retry_after_header: str | None = None,
+    rng: random.Random | None = None,
+    min_cooldown: float = 5.0,
+    max_cooldown: float = 60.0,
+) -> float:
+    r"""Calcula o atraso de resfriamento para HTTP 429 (*Too Many Requests*).
+
+    Quando `Retry-After` estiver presente, respeita a orientação do servidor
+    adicionando margem de dispersão (*jitter*). Caso ausente (comportamento típico
+    do CDN do TSE em contenção temporária), calcula um atraso substancial progressivo
+    baseado em `attempt`, evitando rajadas imediatas que renovem o bloqueio.
+
+    Fórmula sem header:
+    $$t_k = \min(M, \text{Uniform}(c \cdot k, 2c \cdot k))$$
+    onde $M = \text{max\_cooldown}$ e $c = \text{min\_cooldown}$.
+
+    Args:
+        attempt: Índice da tentativa ($k \ge 1$).
+        retry_after_header: Valor textual opcional do cabeçalho HTTP `Retry-After`.
+        rng: Gerador pseudoaleatório opcional para testes determinísticos.
+        min_cooldown: Tempo mínimo base de espera em segundos quando sem cabeçalho.
+        max_cooldown: Teto máximo de tempo de espera em segundos.
+
+    Returns:
+        Tempo de espera em segundos (`>= min_cooldown` e `<= max_cooldown`).
+
+    Raises:
+        Nenhum.
+    """
+    generator = rng or random
+    if retry_after_header is not None:
+        try:
+            server_wait = float(retry_after_header.strip())
+            if server_wait > 0.0:
+                jitter = generator.uniform(0.5, 2.0)
+                return min(max_cooldown, max(min_cooldown, server_wait + jitter))
+        except ValueError:
+            pass
+
+    k = max(1, attempt)
+    low = min(max_cooldown, min_cooldown * k)
+    high = min(max_cooldown, max(low, min_cooldown * 2.0 * k))
+    if low >= max_cooldown:
+        return max_cooldown
+    return generator.uniform(low, high)
+
+
 class TokenBucketRateLimiter:
     """Limitador assíncrono de taxa sustentada baseado em *Token Bucket*.
 
     Args:
         rate_per_sec: Taxa máxima sustentada de requisições por segundo.
         burst: Capacidade máxima de rajada inicial do balde.
+        sleep_func: Função assíncrona de suspensão injetável.
 
     Returns:
         Nenhum.
@@ -96,12 +148,16 @@ class TokenBucketRateLimiter:
         rate_per_sec: float,
         *,
         burst: float | None = None,
+        sleep_func: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        time_func: Callable[[], float] = time.monotonic,
     ) -> None:
         """Inicializa o balde de tokens com capacidade cheia.
 
         Args:
             rate_per_sec: Tokens adicionados por segundo (`> 0`).
             burst: Limite máximo de tokens acumulados.
+            sleep_func: Corrotina assíncrona de espera.
+            time_func: Função de relógio monotônico injetável.
 
         Returns:
             Nenhum.
@@ -114,8 +170,35 @@ class TokenBucketRateLimiter:
         self._rate = rate_per_sec
         self._capacity = burst if burst is not None else max(1.0, rate_per_sec)
         self._tokens = self._capacity
-        self._updated_at = time.monotonic()
+        self._time = time_func
+        self._updated_at = self._time()
+        self._cooldown_until = 0.0
+        self._sleep = sleep_func
         self._lock = asyncio.Lock()
+
+    async def apply_cooldown(self, cooldown_seconds: float) -> None:
+        """Aplica resfriamento global temporário a todas as tarefas concorrentes.
+
+        Ao receber HTTP 429, todas as tarefas que tentarem consumir tokens serão
+        retidas até o término da janela de recuperação informada, e os tokens
+        acumulados são zerados para evitar rajadas imediatas.
+
+        Args:
+            cooldown_seconds: Segundos adicionais de pausa no consumo de tokens.
+
+        Returns:
+            Nenhum.
+
+        Raises:
+            Nenhum.
+        """
+        async with self._lock:
+            now = self._time()
+            target = now + max(0.0, cooldown_seconds)
+            if target > self._cooldown_until:
+                self._cooldown_until = target
+                self._tokens = 0.0
+                self._updated_at = target
 
     async def acquire(self) -> None:
         """Aguarda até que pelo menos 1 token esteja disponível e o consome.
@@ -129,22 +212,29 @@ class TokenBucketRateLimiter:
         Raises:
             Nenhum.
         """
+        wait_sec = 0.0
         async with self._lock:
-            now = time.monotonic()
+            now = self._time()
+            if now < self._cooldown_until:
+                wait_sec = self._cooldown_until - now
+                now = self._cooldown_until
+                self._updated_at = now
+
             elapsed = max(0.0, now - self._updated_at)
             self._tokens = min(self._capacity, self._tokens + elapsed * self._rate)
             self._updated_at = now
 
             if self._tokens >= 1.0:
                 self._tokens -= 1.0
-                return
+            else:
+                needed = 1.0 - self._tokens
+                token_wait = needed / self._rate
+                self._tokens = 0.0
+                self._updated_at = now + token_wait
+                wait_sec += token_wait
 
-            needed = 1.0 - self._tokens
-            wait_sec = needed / self._rate
-            self._tokens = 0.0
-            self._updated_at = now + wait_sec
-
-        await asyncio.sleep(wait_sec)
+        if wait_sec > 0.0:
+            await self._sleep(wait_sec)
 
 
 class CircuitBreaker:

@@ -39,6 +39,7 @@ from pulso_eleitoral.ingestion.resilience import (
     CircuitState,
     TokenBucketRateLimiter,
     compute_full_jitter_delay,
+    compute_rate_limit_delay,
 )
 
 
@@ -275,3 +276,86 @@ def test_checkpoint_store_reading(tmp_path: Path) -> None:
         force_reprocess=True,
     )
     assert len(cp_forced.completed_sections) == 0
+
+
+def test_rate_limit_delay_calculation() -> None:
+    """Verifica atraso substancial e progressivo para HTTP 429.
+
+    Args:
+        Nenhum.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+    rng = random.Random(42)
+    # 1. Sem Retry-After: atraso progressivo respeita limites
+    delay1 = compute_rate_limit_delay(1, rng=rng)
+    assert 5.0 <= delay1 <= 10.0
+
+    delay2 = compute_rate_limit_delay(2, rng=rng)
+    assert 10.0 <= delay2 <= 20.0
+
+    delay5 = compute_rate_limit_delay(5, rng=rng)
+    assert 25.0 <= delay5 <= 50.0
+
+    delay10 = compute_rate_limit_delay(10, rng=rng)
+    assert 50.0 <= delay10 <= 60.0
+
+    delay15 = compute_rate_limit_delay(15, rng=rng)
+    assert delay15 == 60.0  # limitada ao teto de 60s
+
+    # 2. Com Retry-After numérico
+    delay_header = compute_rate_limit_delay(1, retry_after_header="15.0", rng=rng)
+    assert 15.0 <= delay_header <= 17.0
+
+    # 3. Com Retry-After malformado aplica fallback progressivo
+    delay_bad = compute_rate_limit_delay(1, retry_after_header="invalid", rng=rng)
+    assert 5.0 <= delay_bad <= 10.0
+
+
+@pytest.mark.asyncio
+async def test_token_bucket_cooldown() -> None:
+    """Verifica que apply_cooldown retém chamadas subsequentes e zera tokens.
+
+    Args:
+        Nenhum.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+    waited: list[float] = []
+    fake_now = 1000.0
+
+    def fake_time() -> float:
+        return fake_now
+
+    async def fake_sleep(sec: float) -> None:
+        nonlocal fake_now
+        waited.append(sec)
+        fake_now += sec
+
+    limiter = TokenBucketRateLimiter(
+        rate_per_sec=10.0,
+        burst=5.0,
+        sleep_func=fake_sleep,
+        time_func=fake_time,
+    )
+    # Inicialmente há tokens disponíveis imediatamente
+    await limiter.acquire()
+    assert len(waited) == 0
+
+    # Aplica resfriamento de 15 segundos
+    await limiter.apply_cooldown(15.0)
+
+    # Próxima chamada a acquire deve aguardar a janela de resfriamento
+    await limiter.acquire()
+    assert len(waited) == 1
+    assert waited[0] >= 14.9
+    assert fake_now >= 1015.0
+
