@@ -116,6 +116,7 @@ class ElectionRunConfig(BaseModel):
         pleito_id: Código numérico do pleito no TSE (ex.: `406`).
         election_date_iso: Data oficial do turno (`YYYY-MM-DD`).
         ufs: Tupla de UFs a processar (ou `("ALL",)` para expandir as 27 UFs).
+        municipios: Tupla opcional de códigos TSE de municípios para filtragem.
         source_mode: Canal de origem (`cdn` ou `zip`).
         cutoff_mode: Modo de avaliação do corte das 17h (`UNIFIED_BRT` ou `LOCAL_TIME`).
         log_pattern_profile: Nome do perfil de regex em `resources/log_patterns/`.
@@ -136,6 +137,7 @@ class ElectionRunConfig(BaseModel):
     pleito_id: Annotated[int, Field(gt=0)]
     election_date_iso: str | None = None
     ufs: tuple[str, ...] = DOMESTIC_UFS
+    municipios: tuple[int, ...] = ()
     source_mode: SourceMode = SourceMode.ZIP
     cutoff_mode: CutoffMode | None = None
     log_pattern_profile: str | None = None
@@ -176,6 +178,41 @@ class ElectionRunConfig(BaseModel):
         if invalid:
             raise ValueError(f"Siglas de UF inválidas: {', '.join(sorted(invalid))}.")
         return tuple(sorted(set(raw_items)))
+
+    @field_validator("municipios", mode="before")
+    @classmethod
+    def _normalize_municipios(cls, value: object) -> tuple[int, ...]:
+        """Normaliza lista, CSV ou inteiro único de códigos TSE municipais.
+
+        Args:
+            value: Entrada bruta (ex.: `None`, `""`, `"30015,71072"`, `[30015]`).
+
+        Returns:
+            Tupla ordenada e sem duplicatas de códigos TSE inteiros (`> 0`).
+
+        Raises:
+            ValueError: Se algum código municipal não for inteiro positivo.
+        """
+        if value is None:
+            return ()
+        raw_codes: list[int] = []
+        if isinstance(value, int) and not isinstance(value, bool):
+            raw_codes = [value]
+        elif isinstance(value, str):
+            for part in value.split(","):
+                stripped = part.strip()
+                if stripped:
+                    raw_codes.append(int(stripped))
+        elif isinstance(value, (list, tuple, set, frozenset)):
+            for item in value:
+                raw_codes.append(int(str(item).strip()))
+        else:
+            raise ValueError(
+                "Parâmetro 'municipios' deve ser inteiro, CSV ou sequência."
+            )
+        if any(code <= 0 or code > 99999 for code in raw_codes):
+            raise ValueError("Códigos TSE municipais devem estar em [1, 99999].")
+        return tuple(sorted(set(raw_codes)))
 
     @model_validator(mode="after")
     def _populate_defaults_and_validate_date(self) -> ElectionRunConfig:
