@@ -378,6 +378,354 @@ class FlaggedSectionsPayload(BaseModel):
     items: list[FlaggedSectionItem]
 
 
+class TimelineMinuteItem(BaseModel):
+    """Ponto de dados minuto a minuto da série temporal de votação pós-17h.
+
+    Args:
+        minuto: String no formato HH:MM (ex: '17:05').
+        secoes: Quantidade de seções que registraram encerramento no minuto.
+        votos: Volume de votos registrados no minuto.
+        sem_bio: Volume de votos sem biometria no minuto.
+        votos_acumulados: Votos acumulados da janela até este minuto.
+        pct_acumulado: Percentual acumulado frente ao total da janela pós-17h.
+        fase: Classificação da fase do fenômeno temporal.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    minuto: str
+    secoes: int
+    votos: int
+    sem_bio: int
+    votos_acumulados: int
+    pct_acumulado: float
+    fase: str
+
+
+class TimelinePayload(BaseModel):
+    """Contrato do payload de série temporal (timeline.json).
+
+    Args:
+        ano_eleicao: Ano da eleição.
+        turno: Turno (1 ou 2).
+        items: Lista ordenada de pontos temporais por minuto.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    ano_eleicao: int
+    turno: int
+    items: list[TimelineMinuteItem]
+
+
+class GeographyPointItem(BaseModel):
+    """Ponto georreferenciado de município com extensão pós-17h.
+
+    Args:
+        uf: Sigla da Unidade Federativa.
+        municipio_nome: Nome oficial do município.
+        votos_pos: Votos computados após 17h00 BRT.
+        pct_apos_17h: Proporção dos votos pós-17h sobre o total do município.
+        latitude: Coordenada geográfica de latitude.
+        longitude: Coordenada geográfica de longitude.
+        ultimo_voto_str: Horário formatado HH:MM:SS da última seção encerrada.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    uf: str
+    municipio_nome: str
+    votos_pos: int
+    pct_apos_17h: float
+    latitude: float
+    longitude: float
+    ultimo_voto_str: str
+
+
+class CapitalRankingItem(BaseModel):
+    """Item do ranking de capitais por volume absoluto de votos pós-17h.
+
+    Args:
+        uf: Sigla da UF.
+        municipio_nome: Nome da capital.
+        votos_pos: Volume absoluto pós-17h.
+        pct_pos: Percentual sobre o total de votos da capital.
+        ultimo_voto: Horário formatado da última urna encerrada.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    uf: str
+    municipio_nome: str
+    votos_pos: int
+    pct_pos: float
+    ultimo_voto: str
+
+
+class AmazonRankingItem(BaseModel):
+    """Item do ranking de municípios com maior proporção relativa pós-17h.
+
+    Args:
+        uf: Sigla da UF.
+        municipio_nome: Nome do município.
+        votos_pos: Volume absoluto de votos pós-17h.
+        pct_pos: Percentual relativo dos votos pós-17h no município.
+        ultimo_voto: Horário formatado da última urna encerrada.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    uf: str
+    municipio_nome: str
+    votos_pos: int
+    pct_pos: float
+    ultimo_voto: str
+
+
+class GeographyPayload(BaseModel):
+    """Contrato do payload geoespacial (geography.json).
+
+    Args:
+        ano_eleicao: Ano da eleição.
+        turno: Turno (1 ou 2).
+        points: Lista de municípios georreferenciados.
+        capitais: Ranking de capitais por volume absoluto.
+        proporcao: Ranking de municípios por maior impacto relativo.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    ano_eleicao: int
+    turno: int
+    points: list[GeographyPointItem]
+    capitais: list[CapitalRankingItem]
+    proporcao: list[AmazonRankingItem]
+
+
+class BiometricsGroup(BaseModel):
+    """Totais de habilitação biométrica e manual em uma janela temporal.
+
+    Args:
+        total: Total de votos na janela.
+        com_bio: Votos com biometria confirmada.
+        sem_bio: Votos liberados manualmente pelo mesário.
+        pct_com_bio: Percentual com biometria (0 a 100).
+        pct_sem_bio: Percentual sem biometria (0 a 100).
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    total: int
+    com_bio: int
+    sem_bio: int
+    pct_com_bio: float
+    pct_sem_bio: float
+
+
+class BiometricsTimeBucket(BaseModel):
+    """Segmentação horária da taxa de biometria.
+
+    Args:
+        faixa: Rótulo da faixa horária.
+        total: Total de votos na faixa.
+        sem_bio: Votos sem biometria na faixa.
+        pct_sem_bio: Percentual sem biometria.
+        pct_com_bio: Percentual com biometria.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    faixa: str
+    total: int
+    sem_bio: int
+    pct_sem_bio: float
+    pct_com_bio: float
+
+
+class BiometricsPayload(BaseModel):
+    """Contrato do payload de auditoria de biometria (biometrics.json).
+
+    Args:
+        ano_eleicao: Ano da eleição.
+        turno: Turno (1 ou 2).
+        ate_17h: Dados agregados até as 17h00.
+        pos_17h: Dados agregados após as 17h00.
+        delta_sem_bio: Diferença percentual em pontos percentuais (pós vs pré).
+        faixas: Distribuição por faixas horárias.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    ano_eleicao: int
+    turno: int
+    ate_17h: BiometricsGroup
+    pos_17h: BiometricsGroup
+    delta_sem_bio: float
+    faixas: list[BiometricsTimeBucket]
+
+
+class ElectoralImpactPayload(BaseModel):
+    """Contrato do payload de veredito de impacto eleitoral (electoral_impact.json).
+
+    Args:
+        ano_eleicao: Ano da eleição auditada.
+        turno: Turno (1 ou 2).
+        margem_referencia: Margem absoluta oficial de votos.
+        votos_pos_17h: Volume de votos pós-17h.
+        pct_pos_17h: Percentual dos votos pós-17h sobre o eleitorado.
+        impacto_maximo_pct_margem: Percentual máximo que a janela representa na margem.
+        risco_inversao: Booleano indicando risco de reversão de resultado.
+        veredito_deterministico: Texto conclusivo dos bounds de Manski.
+        n_secoes: Quantidade de seções no modelo econométrico.
+        n_municipios: Quantidade de municípios no modelo.
+        beta_pos_17h: Coeficiente da extensão pós-17h.
+        std_err_cluster: Erro-padrão clusterizado.
+        t_statistic: Estatística t de Student.
+        p_value: P-valor bicaudal.
+        ci_95_lower: Limite inferior do intervalo de confiança 95%.
+        ci_95_upper: Limite superior do intervalo de confiança 95%.
+        candidato_favorecido: Candidato que obteve coeficiente positivo.
+        conclusao_estatistica: Síntese da inferência paramétrica.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    ano_eleicao: int
+    turno: int
+    margem_referencia: int
+    votos_pos_17h: int
+    pct_pos_17h: float
+    impacto_maximo_pct_margem: float
+    risco_inversao: bool
+    veredito_deterministico: str
+    n_secoes: int
+    n_municipios: int
+    beta_pos_17h: float
+    std_err_cluster: float
+    t_statistic: float
+    p_value: float
+    ci_95_lower: float
+    ci_95_upper: float
+    candidato_favorecido: str
+    conclusao_estatistica: str
+
+
+class LatestSectionItem(BaseModel):
+    """Registro de seção eleitoral com encerramento tardio.
+
+    Args:
+        uf: Sigla da UF.
+        municipio_nome: Nome do município.
+        zona: Número da zona eleitoral.
+        secao: Número da seção eleitoral.
+        votos_apos_17h: Votos pós-17h computados.
+        sem_bio_apos_17h: Votos sem biometria pós-17h.
+        total_votos: Total de votos da urna.
+        ultimo_voto_brt: Horário formatado HH:MM:SS do último voto.
+        relogio_suspeito: Flag indicativa de anomalia de relógio.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    uf: str
+    municipio_nome: str
+    zona: int
+    secao: int
+    votos_apos_17h: int
+    sem_bio_apos_17h: int
+    total_votos: int
+    ultimo_voto_brt: str
+    relogio_suspeito: bool
+
+
+class LatestSectionsPayload(BaseModel):
+    """Contrato do payload de seções mais tardias (latest_sections.json).
+
+    Args:
+        ano_eleicao: Ano da eleição.
+        turno: Turno (1 ou 2).
+        items: Lista de seções ordenadas pelo último voto.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    ano_eleicao: int
+    turno: int
+    items: list[LatestSectionItem]
+
+
 def export_json_schemas(output_dir: Path) -> dict[str, Path]:
     """Gera arquivos JSON Schema Draft 2020-12 a partir dos modelos Pydantic v2.
 
