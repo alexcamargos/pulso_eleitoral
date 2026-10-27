@@ -206,7 +206,12 @@ class PipelineOrchestrator:
         metrics_buffer: list[ParsedSectionMetrics] = []
         errors_buffer: list[UnprocessedSectionError] = []
         written_files: list[Path] = []
-        chunk_id = 1
+        chunk_id = self._writer.get_next_chunk_id(
+            self._run_cfg.ano_eleicao,
+            self._run_cfg.turno,
+            norm_uf,
+            self._run_cfg.pleito_id,
+        )
         total_sections = 0
         success_sections = 0
         error_sections = 0

@@ -310,3 +310,37 @@ def test_parquet_batch_writer_atomic_operations(tmp_path: Path) -> None:
     assert out_audit is not None
     assert out_audit.is_file()
     assert out_audit.name == "unprocessed_PE.parquet"
+
+
+def test_parquet_writer_get_next_chunk_id(tmp_path: Path) -> None:
+    """Verifica determinação sequencial do próximo chunk_id para evitar sobrescritas.
+
+    Args:
+        tmp_path: Diretório temporário fornecido pelo pytest.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+    settings = PipelineSettings(data_dir=tmp_path / "data")
+    writer = ParquetBatchWriter(settings)
+
+    # 1. Diretório vazio ou inexistente retorna chunk_id = 1
+    assert writer.get_next_chunk_id(2022, 1, "PE", 406) == 1
+
+    # 2. Gravar chunk 1
+    metrics1 = [_make_metric(secao=1)]
+    writer.write_metrics_batch(metrics1, chunk_id=1)
+
+    # 3. Agora o próximo deve ser 2
+    assert writer.get_next_chunk_id(2022, 1, "PE", 406) == 2
+
+    # 4. Gravar chunk 2
+    metrics2 = [_make_metric(secao=2)]
+    writer.write_metrics_batch(metrics2, chunk_id=2)
+
+    # 5. Próximo deve ser 3
+    assert writer.get_next_chunk_id(2022, 1, "PE", 406) == 3
+

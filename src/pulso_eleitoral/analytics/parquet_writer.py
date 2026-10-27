@@ -108,6 +108,44 @@ class ParquetBatchWriter:
         """
         return self._processed_dir / "audit" / f"ano={ano_eleicao}" / f"turno={turno}"
 
+    def get_next_chunk_id(
+        self,
+        ano_eleicao: int,
+        turno: int,
+        uf: str,
+        pleito_id: int,
+    ) -> int:
+        """Determina o próximo chunk_id disponível na partição da UF.
+
+        Evita que novas execuções com checkpoint sobrescrevam partições Parquet
+        previamente consolidadas.
+
+        Args:
+            ano_eleicao: Ano oficial da eleição.
+            turno: Turno da eleição.
+            uf: Sigla da UF.
+            pleito_id: Identificador numérico do pleito.
+
+        Returns:
+            Próximo inteiro sequencial (`>= 1`).
+
+        Raises:
+            Nenhum.
+        """
+        part_dir = self.get_metrics_partition_dir(ano_eleicao, turno, uf)
+        if not part_dir.exists():
+            return 1
+        prefix = f"part-{pleito_id}-{uf.strip().upper()}-"
+        max_id = 0
+        for entry in part_dir.glob(f"{prefix}*.parquet"):
+            stem = entry.stem
+            if stem.endswith(".tmp"):
+                continue
+            suffix = stem[len(prefix):]
+            if suffix.isdigit():
+                max_id = max(max_id, int(suffix))
+        return max_id + 1
+
     def write_metrics_batch(
         self,
         metrics: Sequence[ParsedSectionMetrics],
