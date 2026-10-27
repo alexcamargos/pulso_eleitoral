@@ -534,3 +534,103 @@ class ParsedSectionMetrics:
             "voto_apos_encerramento": self.voto_apos_encerramento,
             "status_processamento": self.status_processamento,
         }
+
+
+@dataclass(slots=True, frozen=True)
+class SensitivityBoundsResult:
+    """Resultado determinístico do teste de limites extremos (Bounds de Manski).
+
+    Confronta o volume total de votos pós-17h com a margem de vitória do pleito.
+
+    Args:
+        total_votos_analisados: Total de votos computados no conjunto auditado.
+        votos_pos_17h: Total absoluto de votos registrados a partir das 17:00:00.
+        pct_pos_17h: Proporção percentual de votos pós-17h frente ao total.
+        margem_eleitoral_referencia: Diferença absoluta oficial entre os candidatos.
+        impacto_maximo_possivel_votos: Deslocamento contrafactual máximo possível.
+        impacto_maximo_pct_margem: Razão percentual do impacto máximo sobre a margem.
+        risco_inversao_resultado: Indica se o volume da janela poderia alterar o vencedor.
+        veredito_deterministico: Mensagem conclusiva formal do teste.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    total_votos_analisados: int
+    votos_pos_17h: int
+    pct_pos_17h: float
+    margem_eleitoral_referencia: int
+    impacto_maximo_possivel_votos: int
+    impacto_maximo_pct_margem: float
+    risco_inversao_resultado: bool
+    veredito_deterministico: str
+
+
+@dataclass(slots=True, frozen=True)
+class ParametricRegressionResult:
+    """Resultado do modelo econométrico de regressão com efeitos fixos municipais.
+
+    Estima o viés da proporção pós-17h sobre o desempenho relativo dos candidatos.
+
+    Args:
+        beta_pos_17h: Coeficiente estimado para a taxa de votos pós-17h.
+        std_err_cluster: Erro-padrão robusto clusterizado no nível de município.
+        t_statistic: Estatística t de Student calculada para H0: beta_1 = 0.
+        p_value: Valor-p bicaudal do teste t.
+        ci_95_lower: Limite inferior do intervalo de confiança de 95%.
+        ci_95_upper: Limite superior do intervalo de confiança de 95%.
+        r_squared_within: Coeficiente de determinação within da regressão.
+        n_secoes: Quantidade de seções eleitorais incluídas na estimação.
+        n_municipios: Quantidade de clusters municipais com efeitos fixos.
+        votos_liquidos_deslocados_estimados: Estimativa pontual de votos deslocados.
+        candidato_favorecido: Nome ou identificador do candidato favorecido (ou 'NEUTRO').
+        conclusao_estatistica: Síntese textual da inferência estatística.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    beta_pos_17h: float
+    std_err_cluster: float
+    t_statistic: float
+    p_value: float
+    ci_95_lower: float
+    ci_95_upper: float
+    r_squared_within: float
+    n_secoes: int
+    n_municipios: int
+    votos_liquidos_deslocados_estimados: float
+    candidato_favorecido: str
+    conclusao_estatistica: str
+
+
+@dataclass(slots=True, frozen=True)
+class ElectoralImpactReport:
+    """Relatório consolidado unindo limites determinísticos e inferência paramétrica.
+
+    Args:
+        ano_eleicao: Ano da eleição auditada.
+        turno: Turno da eleição auditada.
+        bounds: Resultado dos limites extremos determinísticos de Manski.
+        parametric: Resultado do teste paramétrico de regressão (se dados disponíveis).
+        timestamp_analise: Carimbo de data/hora da geração da auditoria.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        Nenhum.
+    """
+
+    ano_eleicao: int
+    turno: int
+    bounds: SensitivityBoundsResult
+    parametric: ParametricRegressionResult | None
+    timestamp_analise: datetime
+
