@@ -28,6 +28,7 @@ from pulso_eleitoral.analytics.electoral_impact import generate_electoral_impact
 from pulso_eleitoral.analytics.orchestrator import PipelineOrchestrator
 from pulso_eleitoral.analytics.verifier import PipelineVerifier
 from pulso_eleitoral.config import (
+    OFFICIAL_2026_TURNO2_MARGIN,
     ElectionRunConfig,
     PipelineSettings,
     SourceMode,
@@ -141,8 +142,8 @@ def _resolve_target_pleito_id(ano: int, turno: int, pleito: int | None) -> int:
 
 @app.command("ingest-parse")
 def ingest_parse(
-    ano: Annotated[int, typer.Option("--ano", help="Ano oficial da eleição.")] = 2022,
-    turno: Annotated[int, typer.Option("--turno", help="Turno (1 ou 2).")] = 1,
+    ano: Annotated[int, typer.Option("--ano", help="Ano oficial da eleição.")] = 2026,
+    turno: Annotated[int, typer.Option("--turno", help="Turno (1 ou 2).")] = 2,
     pleito: Annotated[
         int | None, typer.Option("--pleito", help="ID do pleito TSE.")
     ] = None,
@@ -236,8 +237,8 @@ def ingest_parse(
 
 @app.command("consolidate")
 def consolidate(
-    ano: Annotated[int, typer.Option("--ano", help="Ano oficial da eleição.")] = 2022,
-    turno: Annotated[int, typer.Option("--turno", help="Turno (1 ou 2).")] = 1,
+    ano: Annotated[int, typer.Option("--ano", help="Ano oficial da eleição.")] = 2026,
+    turno: Annotated[int, typer.Option("--turno", help="Turno (1 ou 2).")] = 2,
     db_path: Annotated[
         Path,
         typer.Option("--db-path", help="Caminho do banco analítico DuckDB."),
@@ -282,8 +283,8 @@ def consolidate(
 
 @app.command("export-json")
 def export_json(
-    ano: Annotated[int, typer.Option("--ano", help="Ano oficial da eleição.")] = 2022,
-    turno: Annotated[int, typer.Option("--turno", help="Turno (1 ou 2).")] = 1,
+    ano: Annotated[int, typer.Option("--ano", help="Ano oficial da eleição.")] = 2026,
+    turno: Annotated[int, typer.Option("--turno", help="Turno (1 ou 2).")] = 2,
     pleito: Annotated[
         int | None, typer.Option("--pleito", help="ID do pleito TSE.")
     ] = None,
@@ -372,8 +373,8 @@ def verify(
 
 @app.command("run-all")
 def run_all(
-    ano: Annotated[int, typer.Option("--ano", help="Ano oficial da eleição.")] = 2022,
-    turno: Annotated[int, typer.Option("--turno", help="Turno (1 ou 2).")] = 1,
+    ano: Annotated[int, typer.Option("--ano", help="Ano oficial da eleição.")] = 2026,
+    turno: Annotated[int, typer.Option("--turno", help="Turno (1 ou 2).")] = 2,
     pleito: Annotated[
         int | None, typer.Option("--pleito", help="ID do pleito TSE.")
     ] = None,
@@ -522,9 +523,9 @@ def audit_electoral_impact(
         typer.Option(
             "--margin",
             "-m",
-            help="Margem absoluta oficial de vitória entre os dois candidatos.",
+            help="Margem absoluta oficial de votos (padrão: 4.430.191 do 2ºT de 2026).",
         ),
-    ] = 2_139_645,
+    ] = OFFICIAL_2026_TURNO2_MARGIN,
     candidate_csv: Annotated[
         Path | None,
         typer.Option(
@@ -534,12 +535,12 @@ def audit_electoral_impact(
     ] = None,
     cand_a_name: Annotated[
         str,
-        typer.Option("--cand-a", help="Nome do Candidato A."),
-    ] = "Candidato A",
+        typer.Option("--cand-a", help="Nome do candidato vencedor."),
+    ] = "Lula",
     cand_b_name: Annotated[
         str,
-        typer.Option("--cand-b", help="Nome do Candidato B."),
-    ] = "Candidato B",
+        typer.Option("--cand-b", help="Nome do segundo colocado."),
+    ] = "Segundo Colocado",
     alpha: Annotated[
         float,
         typer.Option("--alpha", help="Nível de significância estatística."),
@@ -572,9 +573,7 @@ def audit_electoral_impact(
         )
         raise typer.Exit(code=1)
 
-    typer.echo(
-        f"\n[pulso test-impact] Iniciando auditoria em '{db_path}'..."
-    )
+    typer.echo(f"\n[pulso test-impact] Iniciando auditoria em '{db_path}'...")
     try:
         report = generate_electoral_impact_report(
             db_path=db_path,

@@ -23,6 +23,7 @@ from pathlib import Path
 import duckdb
 from scipy import stats
 
+from pulso_eleitoral.config import OFFICIAL_2026_TURNO2_MARGIN
 from pulso_eleitoral.contracts.models import (
     ElectoralImpactReport,
     ParametricRegressionResult,
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 def calculate_manski_sensitivity_bounds(
     con: duckdb.DuckDBPyConnection,
-    margin: int = 2_139_645,
+    margin: int = OFFICIAL_2026_TURNO2_MARGIN,
 ) -> SensitivityBoundsResult:
     """Calcula os limites extremos de sensibilidade determinística (Bounds de Manski).
 
@@ -44,7 +45,7 @@ def calculate_manski_sensitivity_bounds(
 
     Args:
         con: Conexão ativa com o banco DuckDB contendo `raw_section_metrics`.
-        margin: Margem absoluta de vitória entre o 1º e 2º (padrão: 2.139.645).
+        margin: Margem absoluta oficial de vitória (padrão: 4.430.191 do 2ºT de 2026).
 
     Returns:
         Instância imutável de `SensitivityBoundsResult` com as métricas do teste.
@@ -68,9 +69,7 @@ def calculate_manski_sensitivity_bounds(
 
     impacto_maximo_votos = votos_pos
     pct_margem = (
-        (impacto_maximo_votos * 100.0 / ref_margin)
-        if ref_margin > 0
-        else float("inf")
+        (impacto_maximo_votos * 100.0 / ref_margin) if ref_margin > 0 else float("inf")
     )
     risco_inversao = bool(impacto_maximo_votos >= ref_margin)
 
@@ -106,8 +105,8 @@ def run_parametric_bias_model(
     con: duckdb.DuckDBPyConnection,
     candidate_csv_path: Path | None = None,
     alpha: float = 0.05,
-    candidate_a_name: str = "Candidato A",
-    candidate_b_name: str = "Candidato B",
+    candidate_a_name: str = "Lula",
+    candidate_b_name: str = "Segundo Colocado",
 ) -> ParametricRegressionResult:
     """Executa o modelo econométrico de efeitos fixos e teste paramétrico t.
 
@@ -412,11 +411,11 @@ def _run_empirical_neutrality_benchmark(
 
 def generate_electoral_impact_report(
     db_path: Path | str = "data/pulso_eleitoral.duckdb",
-    margin: int = 2_139_645,
+    margin: int = OFFICIAL_2026_TURNO2_MARGIN,
     candidate_csv_path: Path | None = None,
     alpha: float = 0.05,
-    candidate_a_name: str = "Candidato A",
-    candidate_b_name: str = "Candidato B",
+    candidate_a_name: str = "Lula",
+    candidate_b_name: str = "Segundo Colocado",
 ) -> ElectoralImpactReport:
     """Gera o relatório consolidado de auditoria e impacto eleitoral da extensão.
 
