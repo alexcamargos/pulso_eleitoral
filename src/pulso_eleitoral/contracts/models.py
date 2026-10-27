@@ -549,7 +549,7 @@ class SensitivityBoundsResult:
         margem_eleitoral_referencia: Diferença absoluta oficial entre os candidatos.
         impacto_maximo_possivel_votos: Deslocamento contrafactual máximo possível.
         impacto_maximo_pct_margem: Razão percentual do impacto máximo sobre a margem.
-        risco_inversao_resultado: Indica se o volume da janela poderia alterar o vencedor.
+        risco_inversao_resultado: Se o volume da janela poderia alterar o vencedor.
         veredito_deterministico: Mensagem conclusiva formal do teste.
 
     Returns:
@@ -586,7 +586,7 @@ class ParametricRegressionResult:
         n_secoes: Quantidade de seções eleitorais incluídas na estimação.
         n_municipios: Quantidade de clusters municipais com efeitos fixos.
         votos_liquidos_deslocados_estimados: Estimativa pontual de votos deslocados.
-        candidato_favorecido: Nome ou identificador do candidato favorecido (ou 'NEUTRO').
+        candidato_favorecido: Identificador do candidato favorecido (ou 'NEUTRO').
         conclusao_estatistica: Síntese textual da inferência estatística.
 
     Returns:
