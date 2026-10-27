@@ -16,6 +16,7 @@ from pulso_eleitoral.analytics.electoral_impact import (
     calculate_manski_sensitivity_bounds,
     run_parametric_bias_model,
 )
+from pulso_eleitoral.config import OFFICIAL_2026_TURNO2_MARGIN
 from pulso_eleitoral.contracts.models import (
     ParametricRegressionResult,
     SensitivityBoundsResult,
@@ -425,7 +426,7 @@ def get_latest_sections(
 
 @st.cache_data(ttl=3600)
 def get_electoral_impact_data(
-    margin: int = 2_139_645,
+    margin: int = OFFICIAL_2026_TURNO2_MARGIN,
     db_path: str = "data/pulso_eleitoral.duckdb",
 ) -> tuple[SensitivityBoundsResult, ParametricRegressionResult]:
     """Obtém as métricas do teste paramétrico e bounds de Manski para o dashboard.
