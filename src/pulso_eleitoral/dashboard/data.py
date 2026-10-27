@@ -57,7 +57,12 @@ def get_national_kpis(db_path: str = "data/pulso_eleitoral.duckdb") -> dict[str,
         SUM(CASE WHEN horario_ultimo_voto_brt < '2026-10-25 18:00:00'
                  THEN votos_apos_17h ELSE 0 END) as votos_h1,
         SUM(CASE WHEN horario_ultimo_voto_brt >= '2026-10-25 18:00:00'
-                 THEN votos_apos_17h ELSE 0 END) as votos_h2
+                 THEN votos_apos_17h ELSE 0 END) as votos_h2,
+        SUM(CASE WHEN horario_ultimo_voto_brt < '2026-10-25 17:15:00'
+                 THEN votos_apos_17h ELSE 0 END) as votos_fila,
+        SUM(CASE WHEN horario_ultimo_voto_brt >= '2026-10-25 17:45:00'
+                 AND horario_ultimo_voto_brt < '2026-10-25 18:30:00'
+                 THEN votos_apos_17h ELSE 0 END) as votos_plato
     FROM raw_section_metrics
     """
     row = con.execute(q).fetchone()
@@ -74,6 +79,8 @@ def get_national_kpis(db_path: str = "data/pulso_eleitoral.duckdb") -> dict[str,
         ultimo_voto,
         votos_h1,
         votos_h2,
+        votos_fila,
+        votos_plato,
     ) = row
 
     total_votos_val = int(total_votos or 0)
@@ -81,8 +88,12 @@ def get_national_kpis(db_path: str = "data/pulso_eleitoral.duckdb") -> dict[str,
     pct_pos = (pos_17h_val / total_votos_val * 100.0) if total_votos_val > 0 else 0.0
     votos_h1_val = int(votos_h1 or 0)
     votos_h2_val = int(votos_h2 or 0)
+    votos_fila_val = int(votos_fila or 0)
+    votos_plato_val = int(votos_plato or 0)
     pct_h1 = (votos_h1_val / pos_17h_val * 100.0) if pos_17h_val > 0 else 0.0
     pct_h2 = (votos_h2_val / pos_17h_val * 100.0) if pos_17h_val > 0 else 0.0
+    pct_fila = (votos_fila_val / pos_17h_val * 100.0) if pos_17h_val > 0 else 0.0
+    pct_plato = (votos_plato_val / pos_17h_val * 100.0) if pos_17h_val > 0 else 0.0
 
     return {
         "total_votos_brasil": total_votos_val,
@@ -99,6 +110,10 @@ def get_national_kpis(db_path: str = "data/pulso_eleitoral.duckdb") -> dict[str,
         "pct_h1": pct_h1,
         "votos_h2": votos_h2_val,
         "pct_h2": pct_h2,
+        "votos_fila": votos_fila_val,
+        "pct_fila": pct_fila,
+        "votos_plato": votos_plato_val,
+        "pct_plato": pct_plato,
     }
 
 
