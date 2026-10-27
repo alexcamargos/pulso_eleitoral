@@ -170,9 +170,12 @@ class ElectionRunConfig(BaseModel):
                 item.strip().upper() for item in value.split(",") if item.strip()
             ]
         elif isinstance(value, (list, tuple, set, frozenset)):
-            raw_items = [
-                str(item).strip().upper() for item in value if str(item).strip()
-            ]
+            raw_items = []
+            for item in value:
+                for sub in str(item).split(","):
+                    stripped = sub.strip().upper()
+                    if stripped:
+                        raw_items.append(stripped)
         else:
             raise ValueError("Parâmetro 'ufs' deve ser string ou sequência de siglas.")
 
