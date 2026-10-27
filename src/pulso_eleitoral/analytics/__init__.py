@@ -13,6 +13,11 @@ Raises:
 from __future__ import annotations
 
 from pulso_eleitoral.analytics.consolidator import DuckDbConsolidator
+from pulso_eleitoral.analytics.electoral_impact import (
+    calculate_manski_sensitivity_bounds,
+    generate_electoral_impact_report,
+    run_parametric_bias_model,
+)
 from pulso_eleitoral.analytics.invariants import (
     validate_dataframe_invariants,
     validate_denominator_completeness,
@@ -40,6 +45,9 @@ __all__ = [
     "PipelineVerificationReport",
     "PipelineVerifier",
     "UfExecutionSummary",
+    "calculate_manski_sensitivity_bounds",
+    "generate_electoral_impact_report",
+    "run_parametric_bias_model",
     "validate_dataframe_invariants",
     "validate_denominator_completeness",
 ]

@@ -76,6 +76,7 @@ module = [
     "pandas.*",
     "plotly.*",
     "pydeck.*",
+    "scipy.*",
     "streamlit.*",
 ]
 ignore_missing_imports = true
