@@ -56,6 +56,21 @@ DOMESTIC_UFS: tuple[str, ...] = (
     "TO",
 )
 
+ALL_UFS: tuple[str, ...] = (
+    *DOMESTIC_UFS,
+    "ZZ",
+)
+
+# Resultados oficiais consolidados do TSE para o 2º Turno Presidencial de 2026
+OFFICIAL_2026_TURNO2_TOTAL_VOTES: int = 128_236_074
+OFFICIAL_2026_TURNO2_VALID_VOTES: int = 124_082_273
+OFFICIAL_2026_TURNO2_BLANK_VOTES: int = 1_430_496
+OFFICIAL_2026_TURNO2_NULL_VOTES: int = 2_723_305
+OFFICIAL_2026_TURNO2_LULA_VOTES: int = 64_256_232
+OFFICIAL_2026_TURNO2_OPPONENT_VOTES: int = 59_826_041
+OFFICIAL_2026_TURNO2_MARGIN: int = 4_430_191
+DEFAULT_2026_TURNO2_MARGIN: int = OFFICIAL_2026_TURNO2_MARGIN
+
 KNOWN_PLEITO_DATES: dict[int, str] = {
     304: "2020-11-15",
     305: "2020-11-29",
@@ -180,6 +195,8 @@ class ElectionRunConfig(BaseModel):
             raise ValueError("Parâmetro 'ufs' deve ser string ou sequência de siglas.")
 
         if not raw_items or "ALL" in raw_items:
+            if "ZZ" in raw_items:
+                return ALL_UFS
             return DOMESTIC_UFS
 
         valid_set = set(DOMESTIC_UFS) | {"ZZ"}

@@ -633,4 +633,3 @@ class ElectoralImpactReport:
     bounds: SensitivityBoundsResult
     parametric: ParametricRegressionResult | None
     timestamp_analise: datetime
-
