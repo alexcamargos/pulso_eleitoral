@@ -1,8 +1,9 @@
 """Definição de estilos CSS customizados e identidade visual do dashboard.
 
-Configura a paleta de cores *Investigative Dark Mode* com detalhes em
-laranja eleitoral (#FF5500), tipografia moderna e cartões com acabamento
-glassmorphism escuro para data journalism.
+Configura a paleta de cores institucional inspirada no projeto Margem Eleitoral:
+fundo dark slate (#0E1117 / #121417), cartões em dark charcoal (#181B20),
+bordas refinadas (#282D37), destaque primário em Sky Blue (#38BDF8) e
+acentos de integridade (#10B981, #F59E0B, #EF4444).
 """
 
 from __future__ import annotations
@@ -11,191 +12,231 @@ import streamlit as st
 
 DASHBOARD_CSS = """
 <style>
-/* Reset de espaçamentos superiores padrão do Streamlit */
+/* Fundo geral e tipografia limpa */
+.stApp {
+    background-color: #121417 !important;
+    color: #E2E8F0 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        sans-serif !important;
+}
+
+/* Redução de espaçamentos superiores nativos do Streamlit */
 .block-container {
-    padding-top: 1.5rem !important;
-    padding-bottom: 3rem !important;
+    padding-top: 1.25rem !important;
+    padding-bottom: 3.5rem !important;
     max-width: 1280px !important;
 }
 
-/* Tipografia global e fundo */
-body {
-    background-color: #0A0B0E !important;
-    color: #F1F3F5 !important;
+/* Breadcrumbs e Cabeçalho Superior */
+.breadcrumb-text {
+    color: #94A3B8;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 4px;
 }
 
-/* Badge de topo */
-.hero-badge {
-    display: inline-flex;
+.main-header-title {
+    font-size: 27px;
+    font-weight: 800;
+    color: #F8FAFC;
+    margin-bottom: 6px;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+}
+
+.main-header-subtitle {
+    font-size: 14px;
+    color: #94A3B8;
+    line-height: 1.5;
+    margin-bottom: 18px;
+    max-width: 900px;
+}
+
+/* Banner de Contexto da Totalização Oficial */
+.tse-summary-card {
+    background-color: #181B20;
+    border: 1px solid #282D37;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+}
+
+.tse-summary-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #F1F5F9;
+    margin-bottom: 4px;
+    display: flex;
     align-items: center;
-    gap: 0.5rem;
-    background: rgba(255, 85, 0, 0.12);
-    border: 1px solid rgba(255, 85, 0, 0.35);
-    color: #FF7A29;
-    padding: 0.35rem 0.85rem;
-    border-radius: 9999px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    margin-bottom: 0.75rem;
+    gap: 8px;
 }
 
-/* Título Monumental */
-.hero-title {
-    font-size: clamp(2.2rem, 5vw, 3.8rem);
-    font-weight: 900;
-    line-height: 1.08;
-    color: #FFFFFF;
-    margin: 0;
-    letter-spacing: -0.03em;
-}
-
-.hero-highlight {
-    color: #FF5500;
-    text-shadow: 0 0 25px rgba(255, 85, 0, 0.4);
-}
-
-.hero-subtext {
-    font-size: 1.1rem;
-    color: #9DA3AE;
-    line-height: 1.55;
-    margin-top: 0.85rem;
-    margin-bottom: 2rem;
-    max-width: 820px;
-}
-
-/* Cartões de KPI Monumentais */
-.kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2.5rem;
-}
-
-.kpi-card {
-    background: #13151C;
-    border: 1px solid #1F222E;
-    border-radius: 14px;
-    padding: 1.25rem 1.5rem;
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.15s ease, border-color 0.15s ease;
-}
-
-.kpi-card:hover {
-    border-color: rgba(255, 85, 0, 0.4);
-    transform: translateY(-2px);
-}
-
-.kpi-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #FF5500 0%, #FF9E00 100%);
-    opacity: 0.8;
-}
-
-.kpi-value {
-    font-size: 2.1rem;
-    font-weight: 800;
-    color: #FFFFFF;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-}
-
-.kpi-label {
-    font-size: 0.8rem;
-    color: #8C93A4;
-    text-transform: uppercase;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    margin-top: 0.4rem;
-}
-
-.kpi-sub {
-    font-size: 0.82rem;
-    color: #FF7A29;
-    font-weight: 500;
-    margin-top: 0.35rem;
-}
-
-/* Títulos de Seções Narrativas */
-.section-tag {
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #FF5500;
-    margin-bottom: 0.25rem;
-}
-
-.section-title {
-    font-size: 1.8rem;
-    font-weight: 800;
-    color: #FFFFFF;
-    letter-spacing: -0.02em;
-    margin-top: 0;
-    margin-bottom: 0.4rem;
-}
-
-.section-desc {
-    font-size: 0.95rem;
-    color: #9DA3AE;
+.tse-summary-stats {
+    color: #94A3B8;
+    font-size: 13px;
     line-height: 1.5;
-    margin-bottom: 1.25rem;
 }
 
-/* Card Metodológico Didático */
-.method-card {
-    background: #111319;
-    border: 1px solid #1E212B;
-    border-radius: 12px;
-    padding: 1.25rem;
+/* Hero Executive Story Cards */
+.hero-card {
+    background-color: #181B20;
+    border: 1px solid #282D37;
+    border-radius: 10px;
+    padding: 18px 20px;
     height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }
 
-.method-tag {
-    font-size: 0.7rem;
+.hero-card:hover {
+    border-color: #38BDF8;
+    transition: border-color 0.2s ease;
+}
+
+.hero-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11.5px;
     font-weight: 700;
-    color: #FF5500;
+    color: #94A3B8;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
 }
 
-.method-title {
-    font-size: 1.05rem;
+.hero-pill {
+    font-size: 11px;
     font-weight: 700;
-    color: #FFFFFF;
-    margin: 0.3rem 0 0.5rem 0;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    letter-spacing: 0.3px;
 }
 
-.method-text {
-    font-size: 0.85rem;
-    color: #8C93A4;
+.hero-pill-info {
+    background: rgba(56, 189, 248, 0.15);
+    color: #38BDF8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.hero-pill-success {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10B981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.hero-pill-warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #F59E0B;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.hero-metric-val {
+    font-size: 32px;
+    font-weight: 800;
+    color: #F8FAFC;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
+}
+
+.hero-metric-sub {
+    font-size: 13px;
+    color: #94A3B8;
+    margin-top: 6px;
+    line-height: 1.4;
+}
+
+/* Customização refinada das Abas (stTabs) padrão Margem Eleitoral */
+.stTabs [data-baseweb="tab-list"],
+div[data-testid="stTabs"] [data-baseweb="tab-list"] {
+    gap: 6px !important;
+    border-bottom: 1px solid #282D37 !important;
+    margin-bottom: 18px !important;
+}
+
+.stTabs [data-baseweb="tab"],
+button[data-baseweb="tab"] {
+    background-color: #181B20 !important;
+    border: 1px solid #282D37 !important;
+    border-radius: 6px 6px 0 0 !important;
+    color: #CBD5E1 !important;
+    padding: 8px 16px !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+}
+
+.stTabs [aria-selected="true"],
+button[data-baseweb="tab"][aria-selected="true"] {
+    background-color: #242933 !important;
+    color: #38BDF8 !important;
+    border-bottom: 2px solid #38BDF8 !important;
+}
+
+.stTabs [aria-selected="true"] p,
+button[data-baseweb="tab"][aria-selected="true"] p {
+    color: #38BDF8 !important;
+    font-weight: 700 !important;
+}
+
+/* Cards informativos e didáticos internos */
+.info-box {
+    background-color: #181B20;
+    border: 1px solid #282D37;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 14px;
+}
+
+.info-box-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #F8FAFC;
+    margin-bottom: 6px;
+}
+
+.info-box-desc {
+    font-size: 13px;
+    color: #94A3B8;
     line-height: 1.5;
     margin: 0;
 }
 
-/* Customização dos widgets do Streamlit */
-div[data-baseweb="select"] > div {
-    background-color: #13151C !important;
-    border-color: #1F222E !important;
-    color: #FFFFFF !important;
-}
-
-/* Linha divisória suave */
+/* Linha divisória sutil */
 .custom-divider {
     height: 1px;
-    background: #1A1D26;
-    margin: 2.5rem 0;
+    background: #282D37;
+    margin: 20px 0;
     border: none;
 }
 </style>
 """
+
+
+def clean_html(html_str: str) -> str:
+    """Higieniza e compacta strings HTML para renderização nativa segura no Streamlit.
+
+    Remove quebras de linha e recuos que fazem o analisador CommonMark do Streamlit
+    interpretar o markup HTML como bloco de código pré-formatado (indent code block).
+
+    Args:
+        html_str: String de markup HTML com potenciais quebras de linha e recuos.
+
+    Returns:
+        String HTML compactada e contínua em linha única.
+
+    Raises:
+        Nenhum.
+    """
+    lines = [
+        line.strip()
+        for line in html_str.splitlines()
+        if line.strip() and not line.strip().startswith("<!--")
+    ]
+    return "".join(lines)
 
 
 def apply_custom_styles() -> None:
