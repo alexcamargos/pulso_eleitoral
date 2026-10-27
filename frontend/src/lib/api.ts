@@ -4,6 +4,11 @@ import {
   StatesSummaryPayload,
   MunicipalitiesPayload,
   FlaggedSectionsPayload,
+  TimelinePayload,
+  GeographyPayload,
+  BiometricsPayload,
+  ElectoralImpactPayload,
+  LatestSectionsPayload,
 } from "../types/audit";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -118,4 +123,74 @@ export function getTseResultUrl(
   const zonaStr = String(zona).padStart(4, "0");
   const secaoStr = String(secao).padStart(4, "0");
   return `https://resultados.tse.jus.br/oficial/#/eleicao/ele${ano}/detalhe-da-secao/${ufLower}/${munStr}/${zonaStr}/${secaoStr}`;
+}
+
+export async function fetchTimeline(
+  ano: number = 2026,
+  turno: number = 2
+): Promise<TimelinePayload | null> {
+  try {
+    const res = await fetch(`${getApiBaseUrl(ano, turno)}/timeline.json`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.error("Falha ao carregar timeline.json:", err);
+    return null;
+  }
+}
+
+export async function fetchGeography(
+  ano: number = 2026,
+  turno: number = 2
+): Promise<GeographyPayload | null> {
+  try {
+    const res = await fetch(`${getApiBaseUrl(ano, turno)}/geography.json`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.error("Falha ao carregar geography.json:", err);
+    return null;
+  }
+}
+
+export async function fetchBiometrics(
+  ano: number = 2026,
+  turno: number = 2
+): Promise<BiometricsPayload | null> {
+  try {
+    const res = await fetch(`${getApiBaseUrl(ano, turno)}/biometrics.json`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.error("Falha ao carregar biometrics.json:", err);
+    return null;
+  }
+}
+
+export async function fetchElectoralImpact(
+  ano: number = 2026,
+  turno: number = 2
+): Promise<ElectoralImpactPayload | null> {
+  try {
+    const res = await fetch(`${getApiBaseUrl(ano, turno)}/electoral_impact.json`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.error("Falha ao carregar electoral_impact.json:", err);
+    return null;
+  }
+}
+
+export async function fetchLatestSections(
+  ano: number = 2026,
+  turno: number = 2
+): Promise<LatestSectionsPayload | null> {
+  try {
+    const res = await fetch(`${getApiBaseUrl(ano, turno)}/latest_sections.json`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.error("Falha ao carregar latest_sections.json:", err);
+    return null;
+  }
 }

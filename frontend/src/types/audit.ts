@@ -130,3 +130,117 @@ export interface FlaggedSectionsPayload {
   returned_sections: number;
   items: FlaggedSectionItem[];
 }
+
+export interface TimelineMinuteItem {
+  minuto: string;
+  secoes: number;
+  votos: number;
+  sem_bio: number;
+  votos_acumulados: number;
+  pct_acumulado: number;
+  fase: string;
+}
+
+export interface TimelinePayload {
+  ano_eleicao: number;
+  turno: number;
+  items: TimelineMinuteItem[];
+}
+
+export interface GeographyPointItem {
+  uf: string;
+  municipio_nome: string;
+  votos_pos: number;
+  pct_apos_17h: number;
+  latitude: number;
+  longitude: number;
+  ultimo_voto_str: string;
+}
+
+export interface CapitalRankingItem {
+  uf: string;
+  municipio_nome: string;
+  votos_pos: number;
+  pct_pos: number;
+  ultimo_voto: string;
+}
+
+export interface AmazonRankingItem {
+  uf: string;
+  municipio_nome: string;
+  votos_pos: number;
+  pct_pos: number;
+  ultimo_voto: string;
+}
+
+export interface GeographyPayload {
+  ano_eleicao: number;
+  turno: number;
+  points: GeographyPointItem[];
+  capitais: CapitalRankingItem[];
+  proporcao: AmazonRankingItem[];
+}
+
+export interface BiometricsGroup {
+  total: number;
+  com_bio: number;
+  sem_bio: number;
+  pct_com_bio: number;
+  pct_sem_bio: number;
+}
+
+export interface BiometricsTimeBucket {
+  faixa: string;
+  total: number;
+  sem_bio: number;
+  pct_sem_bio: number;
+  pct_com_bio: number;
+}
+
+export interface BiometricsPayload {
+  ano_eleicao: number;
+  turno: number;
+  ate_17h: BiometricsGroup;
+  pos_17h: BiometricsGroup;
+  delta_sem_bio: number;
+  faixas: BiometricsTimeBucket[];
+}
+
+export interface ElectoralImpactPayload {
+  ano_eleicao: number;
+  turno: number;
+  margem_referencia: number;
+  votos_pos_17h: number;
+  pct_pos_17h: number;
+  impacto_maximo_pct_margem: number;
+  risco_inversao: boolean;
+  veredito_deterministico: string;
+  n_secoes: number;
+  n_municipios: number;
+  beta_pos_17h: number;
+  std_err_cluster: number;
+  t_statistic: number;
+  p_value: number;
+  ci_95_lower: number;
+  ci_95_upper: number;
+  candidato_favorecido: string;
+  conclusao_estatistica: string;
+}
+
+export interface LatestSectionItem {
+  uf: string;
+  municipio_nome: string;
+  zona: number;
+  secao: number;
+  votos_apos_17h: number;
+  sem_bio_apos_17h: number;
+  total_votos: number;
+  ultimo_voto_brt: string;
+  relogio_suspeito: boolean;
+}
+
+export interface LatestSectionsPayload {
+  ano_eleicao: number;
+  turno: number;
+  items: LatestSectionItem[];
+}

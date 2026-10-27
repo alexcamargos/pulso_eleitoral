@@ -2,108 +2,82 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Header } from "../components/Header";
-import { KpiCards } from "../components/KpiCards";
-import { StatesTable } from "../components/StatesTable";
-import { MunicipalDrilldown } from "../components/MunicipalDrilldown";
-import { FlaggedSectionsTable } from "../components/FlaggedSectionsTable";
+import { HeroExecutiveCards } from "../components/HeroExecutiveCards";
+import { TabsNav, TabId } from "../components/TabsNav";
+import { TimelineTab } from "../components/TimelineTab";
+import { GeographyTab } from "../components/GeographyTab";
+import { IntegrityTab } from "../components/IntegrityTab";
+import { VerdictTab } from "../components/VerdictTab";
 import { MethodologyModal } from "../components/MethodologyModal";
 import {
   MetadataPayload,
   NationalSummaryPayload,
-  StatesSummaryPayload,
-  MunicipalitiesPayload,
-  FlaggedSectionsPayload,
+  TimelinePayload,
+  GeographyPayload,
+  BiometricsPayload,
+  ElectoralImpactPayload,
+  LatestSectionsPayload,
 } from "../types/audit";
 import {
   fetchMetadata,
   fetchNationalSummary,
-  fetchStatesSummary,
-  fetchMunicipalities,
-  fetchFlaggedSections,
+  fetchTimeline,
+  fetchGeography,
+  fetchBiometrics,
+  fetchElectoralImpact,
+  fetchLatestSections,
 } from "../lib/api";
 
 export default function HomePage() {
-  const [ano, setAno] = useState<number>(2022);
-  const [turno, setTurno] = useState<number>(1);
-  const [selectedUf, setSelectedUf] = useState<string | null>(null);
+  const [ano, setAno] = useState<number>(2026);
+  const [turno, setTurno] = useState<number>(2);
+  const [activeTab, setActiveTab] = useState<TabId>("timeline");
 
   const [metadata, setMetadata] = useState<MetadataPayload | null>(null);
   const [nationalSummary, setNationalSummary] = useState<NationalSummaryPayload | null>(null);
-  const [statesSummary, setStatesSummary] = useState<StatesSummaryPayload | null>(null);
-  const [municipalitiesData, setMunicipalitiesData] = useState<MunicipalitiesPayload | null>(null);
-  const [flaggedSectionsData, setFlaggedSectionsData] = useState<FlaggedSectionsPayload | null>(null);
+  const [timelineData, setTimelineData] = useState<TimelinePayload | null>(null);
+  const [geographyData, setGeographyData] = useState<GeographyPayload | null>(null);
+  const [biometricsData, setBiometricsData] = useState<BiometricsPayload | null>(null);
+  const [impactData, setImpactData] = useState<ElectoralImpactPayload | null>(null);
+  const [sectionsData, setSectionsData] = useState<LatestSectionsPayload | null>(null);
 
-  const [loadingGeneral, setLoadingGeneral] = useState<boolean>(true);
-  const [loadingMunicipalities, setLoadingMunicipalities] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [isMethodologyOpen, setIsMethodologyOpen] = useState<boolean>(false);
 
-  // Carrega dados nacionais e estaduais ao trocar ano/turno
-  const loadGeneralData = useCallback(async (year: number, round: number) => {
-    setLoadingGeneral(true);
+  // Carrega datasets analíticos ao selecionar pleito/turno
+  const loadDashboardData = useCallback(async (year: number, round: number) => {
+    setLoading(true);
     try {
-      const [meta, nat, states, flagged] = await Promise.all([
+      const [meta, nat, time, geo, bio, impact, sec] = await Promise.all([
         fetchMetadata(year, round),
         fetchNationalSummary(year, round),
-        fetchStatesSummary(year, round),
-        fetchFlaggedSections(undefined, year, round),
+        fetchTimeline(year, round),
+        fetchGeography(year, round),
+        fetchBiometrics(year, round),
+        fetchElectoralImpact(year, round),
+        fetchLatestSections(year, round),
       ]);
       setMetadata(meta);
       setNationalSummary(nat);
-      setStatesSummary(states);
-      setFlaggedSectionsData(flagged);
+      setTimelineData(time);
+      setGeographyData(geo);
+      setBiometricsData(bio);
+      setImpactData(impact);
+      setSectionsData(sec);
     } catch (err) {
-      console.error("Erro ao carregar dados do dashboard:", err);
+      console.error("Erro ao carregar dados analíticos do Pulso Eleitoral:", err);
     } finally {
-      setLoadingGeneral(false);
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadGeneralData(ano, turno);
-  }, [ano, turno, loadGeneralData]);
-
-  // Carrega municípios e seções da UF quando uma UF é selecionada
-  const handleSelectUf = async (uf: string) => {
-    if (selectedUf === uf) {
-      // Toggle off
-      setSelectedUf(null);
-      setMunicipalitiesData(null);
-      // Recarrega flagged sections nacional
-      const flagged = await fetchFlaggedSections(undefined, ano, turno);
-      setFlaggedSectionsData(flagged);
-      return;
-    }
-
-    setSelectedUf(uf);
-    setLoadingMunicipalities(true);
-    try {
-      const [mun, flagged] = await Promise.all([
-        fetchMunicipalities(uf, ano, turno),
-        fetchFlaggedSections(uf, ano, turno),
-      ]);
-      setMunicipalitiesData(mun);
-      if (flagged && flagged.items.length > 0) {
-        setFlaggedSectionsData(flagged);
-      }
-    } catch (err) {
-      console.error(`Erro ao carregar dados da UF ${uf}:`, err);
-    } finally {
-      setLoadingMunicipalities(false);
-    }
-  };
-
-  const handleClearUf = async () => {
-    setSelectedUf(null);
-    setMunicipalitiesData(null);
-    const flagged = await fetchFlaggedSections(undefined, ano, turno);
-    setFlaggedSectionsData(flagged);
-  };
+    loadDashboardData(ano, turno);
+  }, [ano, turno, loadDashboardData]);
 
   const handleSelectElection = (newAno: number, newTurno: number) => {
     setAno(newAno);
     setTurno(newTurno);
-    setSelectedUf(null);
-    setMunicipalitiesData(null);
   };
 
   return (
@@ -116,94 +90,56 @@ export default function HomePage() {
         onOpenMethodology={() => setIsMethodologyOpen(true)}
       />
 
-      <main id="main-content" className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
-        {/* Banner Informativo Rápido */}
-        <section
-          aria-label="Aviso Legal e Metodológico"
-          className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm"
-        >
-          <div>
-            <strong>Auditoria Cidadã Independente:</strong> Dados abertos oficiais do Tribunal Superior Eleitoral (TSE).
-            Horários normalizados para o Horário de Brasília (BRT / UTC-3). Eleitores na fila às 17h00 têm direito ao voto por senha legal.
-          </div>
-          <button
-            onClick={() => setIsMethodologyOpen(true)}
-            className="text-blue-700 underline font-semibold whitespace-nowrap hover:text-blue-900"
-          >
-            Ler notas metodológicas completas &rarr;
-          </button>
-        </section>
+      <main id="main-content" className="flex-1 max-w-[1280px] mx-auto px-4 sm:px-6 py-5 w-full">
+        {/* 1. Hero Executive Story Cards */}
+        <HeroExecutiveCards
+          summary={nationalSummary}
+          ano={ano}
+          turno={turno}
+          loading={loading}
+        />
 
-        {/* KPIs Nacionais */}
-        <section aria-label="Indicadores Nacionais" className="mb-6">
-          <KpiCards summary={nationalSummary} loading={loadingGeneral} />
-        </section>
+        {/* 2. Navegação em Abas Narrativas Científicas */}
+        <TabsNav activeTab={activeTab} onTabChange={setActiveTab} />
 
-        {/* Comparativo Regional (27 UFs) */}
-        <section aria-label="Comparativo por Unidade Federativa" className="mb-6">
-          <StatesTable
-            states={statesSummary?.states || []}
-            selectedUf={selectedUf}
-            onSelectUf={handleSelectUf}
-            loading={loadingGeneral}
-          />
-        </section>
+        {/* 3. Renderização Dinâmica dos 4 Atos */}
+        <div className="pb-8">
+          {activeTab === "timeline" && (
+            <TimelineTab data={timelineData} loading={loading} />
+          )}
 
-        {/* Drill-down Municipal (quando UF selecionada) */}
-        {selectedUf && (
-          <section aria-label="Detalhamento Municipal">
-            <MunicipalDrilldown
-              data={municipalitiesData}
-              uf={selectedUf}
-              loading={loadingMunicipalities}
-              onClearUf={handleClearUf}
+          {activeTab === "geography" && (
+            <GeographyTab data={geographyData} loading={loading} />
+          )}
+
+          {activeTab === "integrity" && (
+            <IntegrityTab data={biometricsData} loading={loading} />
+          )}
+
+          {activeTab === "verdict" && (
+            <VerdictTab
+              impactData={impactData}
+              sectionsData={sectionsData}
+              ano={ano}
+              loading={loading}
             />
-          </section>
-        )}
-
-        {/* Explorador de Seções Sinalizadas */}
-        <section aria-label="Explorador de Seções Sinalizadas" className="mb-8">
-          <FlaggedSectionsTable
-            sections={flaggedSectionsData?.items || []}
-            ano={ano}
-            loading={loadingGeneral}
-            activeUf={selectedUf}
-          />
-        </section>
+          )}
+        </div>
       </main>
 
-      {/* Rodapé de Governança e Transparência */}
-      <footer className="bg-slate-900 text-slate-400 py-6 border-t border-slate-800 text-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      {/* 4. Rodapé Institucional idêntico ao Streamlit */}
+      <footer className="text-center text-[#64748B] text-xs py-8 border-t border-[#1E242C] mt-8 bg-[#121417]">
+        <div className="max-w-[1280px] mx-auto px-4 space-y-1">
           <div>
-            <p className="font-semibold text-slate-300">
-              Pulso Eleitoral — Auditoria Técnica e Reproduzível de Urnas TSE
-            </p>
-            <p className="text-[11px] text-slate-500 mt-1">
-              Desenvolvido segundo o protocolo SDD (AI-Native Spec-First). Zero banco relacional em runtime.
-            </p>
+            <strong className="text-[#94A3B8]">Pulso Eleitoral</strong> &bull; Auditoria de Logs de Urna TSE.
           </div>
-          <div className="flex items-center gap-4 text-slate-400">
-            <button
-              onClick={() => setIsMethodologyOpen(true)}
-              className="hover:text-white transition-colors"
-            >
-              Transparência Metodológica
-            </button>
-            <span>&bull;</span>
-            <a
-              href="https://resultados.tse.jus.br"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-white transition-colors"
-            >
-              Portal TSE Oficial
-            </a>
+          <div>
+            Dados abertos oficiais do Tribunal Superior Eleitoral (TSE). Horários normalizados para o Horário de Brasília (BRT / UTC-3).
           </div>
         </div>
       </footer>
 
-      {/* Modal de Metodologia */}
+      {/* Modal de Transparência Metodológica */}
       <MethodologyModal
         isOpen={isMethodologyOpen}
         onClose={() => setIsMethodologyOpen(false)}
