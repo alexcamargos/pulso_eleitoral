@@ -177,7 +177,7 @@ def render_timeline_tab(df_timeline: pd.DataFrame) -> None:
         hovermode="x unified",
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig)
 
     c1, c2, c3 = st.columns(3)
     with c1:

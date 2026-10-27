@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import streamlit as st
 
+from pulso_eleitoral.config import OFFICIAL_2026_TURNO2_MARGIN
 from pulso_eleitoral.dashboard.data import (
     get_electoral_impact_data,
     get_latest_sections,
@@ -50,15 +51,15 @@ def render_verdict_tab(db_path: str = "data/pulso_eleitoral.duckdb") -> None:
         margin_input = st.number_input(
             "Margem Oficial de Vitória (Votos):",
             min_value=1,
-            value=2_139_645,
+            value=OFFICIAL_2026_TURNO2_MARGIN,
             step=50_000,
             help="Diferença oficial de votos entre os dois candidatos mais votados.",
         )
     with c_in2:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
         st.caption(
-            "Simulação dinâmica: ajuste a margem para testar em qual ponto "
-            "o volume da janela pós-17h poderia teoricamente ameaçar o resultado."
+            "Padrão: Margem oficial real do 2º turno de 2026 (4.430.191 votos entre "
+            "Lula e o 2º colocado no TSE)."
         )
 
     bounds, param = get_electoral_impact_data(
@@ -105,7 +106,7 @@ def render_verdict_tab(db_path: str = "data/pulso_eleitoral.duckdb") -> None:
             <div class="hero-card-header">
                 <span style="color: {card_border};">Conclusão da Auditoria</span>
                 <span class="{pill_class}">
-                    {'Aprovado' if not bounds.risco_inversao_resultado else 'Atenção'}
+                    {"Aprovado" if not bounds.risco_inversao_resultado else "Atenção"}
                 </span>
             </div>
             <div class="hero-metric-val" style="color: {card_border}; font-size: 26px;">
@@ -255,6 +256,7 @@ def render_verdict_tab(db_path: str = "data/pulso_eleitoral.duckdb") -> None:
             "AC",
             "AP",
             "RR",
+            "ZZ",
         ]
         sel_uf = st.selectbox("Filtrar por UF:", options=ufs, index=0)
 
@@ -274,7 +276,6 @@ def render_verdict_tab(db_path: str = "data/pulso_eleitoral.duckdb") -> None:
     if not df_secoes.empty:
         st.dataframe(
             df_secoes,
-            use_container_width=True,
             hide_index=True,
         )
     else:
