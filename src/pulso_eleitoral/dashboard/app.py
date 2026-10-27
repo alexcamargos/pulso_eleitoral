@@ -1,7 +1,7 @@
 """Aplicação principal do dashboard interativo Streamlit do Pulso Eleitoral.
 
-Implementa a narrativa científica de auditoria eleitoral no padrão de UI/UX
-e storytelling do projeto Margem Eleitoral (Alexsander Camargos).
+Implementa a narrativa científica de auditoria eleitoral com análise do
+fluxo temporal, distribuição geoespacial, integridade biométrica e teste de estresse.
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ def main() -> None:
         initial_sidebar_state="collapsed",
     )
 
-    # Aplica identidade visual e estilos customizados (Padrão Margem Eleitoral)
+    # Aplica identidade visual e estilos customizados
     apply_custom_styles()
 
     # Carrega métricas consolidadas do banco analítico DuckDB
@@ -94,12 +94,7 @@ def main() -> None:
                 border-top: 1px solid #1E242C; padding-top: 1.5rem;'>
         <strong>Pulso Eleitoral</strong> &bull; Auditoria de Logs de Urna TSE.<br/>
         Dados abertos oficiais do Tribunal Superior Eleitoral (TSE).
-        Horários normalizados para o Horário de Brasília (BRT / UTC-3).<br/>
-        Storytelling Científico inspirado no projeto
-        <a href='https://github.com/alexcamargos/margem_eleitoral'
-           target='_blank' style='color: #38BDF8; text-decoration: none;'>
-            Margem Eleitoral
-        </a> (Alexsander Camargos).
+        Horários normalizados para o Horário de Brasília (BRT / UTC-3).
     </div>
     """
     st.html(clean_html(footer_html))

@@ -1,6 +1,6 @@
 """Componente visual de Storytelling Executivo (Hero Executive Story Cards).
 
-Renderiza a síntese no topo da aplicação no padrão do projeto Margem Eleitoral:
+Renderiza a síntese executiva no topo da aplicação:
 1. Breadcrumbs de auditoria oficial TSE.
 2. Título principal analítico e subtítulo contextual.
 3. Banner de contexto oficial do comparecimento do 2º turno de 2026.
