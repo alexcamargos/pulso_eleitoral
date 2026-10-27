@@ -109,7 +109,7 @@ def render_integrity_tab(bio_data: dict[str, Any]) -> None:
                 automargin=True,
             ),
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig)
 
     with col2:
         card_html = f"""

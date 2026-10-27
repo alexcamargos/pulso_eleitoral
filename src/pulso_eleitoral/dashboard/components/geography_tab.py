@@ -152,7 +152,7 @@ def render_geography_tab(
         tooltip=tooltip,
     )
 
-    st.pydeck_chart(deck, use_container_width=True)
+    st.pydeck_chart(deck)
 
     st.caption(
         f"Exibindo **{len(df_filtered):,}** de **{len(df_map):,}** municípios "
@@ -192,9 +192,7 @@ def render_geography_tab(
                     hovertemplate="<b>%{y}</b>: %{x:,.0f} votos<extra></extra>",
                 )
             )
-            max_cap = (
-                float(df_cap["votos_pos"].max()) if not df_cap.empty else 5000.0
-            )
+            max_cap = float(df_cap["votos_pos"].max()) if not df_cap.empty else 5000.0
             fig_cap.update_layout(
                 template="plotly_dark",
                 paper_bgcolor="#181B20",
@@ -212,7 +210,7 @@ def render_geography_tab(
                     automargin=True,
                 ),
             )
-            st.plotly_chart(fig_cap, use_container_width=True)
+            st.plotly_chart(fig_cap)
 
     with c_rank2:
         st.markdown(
@@ -245,9 +243,7 @@ def render_geography_tab(
                     hovertemplate="<b>%{y}</b>: %{x:.2f}% dos votos<extra></extra>",
                 )
             )
-            max_prop = (
-                float(df_prop["pct_pos"].max()) if not df_prop.empty else 10.0
-            )
+            max_prop = float(df_prop["pct_pos"].max()) if not df_prop.empty else 10.0
             fig_prop.update_layout(
                 template="plotly_dark",
                 paper_bgcolor="#181B20",
@@ -265,4 +261,4 @@ def render_geography_tab(
                     automargin=True,
                 ),
             )
-            st.plotly_chart(fig_prop, use_container_width=True)
+            st.plotly_chart(fig_prop)
