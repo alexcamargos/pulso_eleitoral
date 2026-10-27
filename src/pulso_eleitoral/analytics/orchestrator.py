@@ -17,6 +17,7 @@ Raises:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from concurrent.futures import Executor, ProcessPoolExecutor
 from dataclasses import dataclass
@@ -203,6 +204,10 @@ class PipelineOrchestrator:
             else:
                 pool = None
 
+        pool_lock = asyncio.Lock()
+        pool_restarts = 0
+        pool_disabled = False
+
         metrics_buffer: list[ParsedSectionMetrics] = []
         errors_buffer: list[UnprocessedSectionError] = []
         written_files: list[Path] = []
@@ -216,8 +221,10 @@ class PipelineOrchestrator:
         success_sections = 0
         error_sections = 0
 
-        # Semáforo para garantir backpressure rigoroso
-        max_in_flight = max(1, self._settings.max_in_flight)
+        # Semáforo para garantir backpressure rigoroso sem sobrecarregar IPC do Windows
+        configured_max = self._settings.max_in_flight
+        ipc_cap = max(4, self._settings.workers * 4)
+        max_in_flight = max(1, min(configured_max, ipc_cap))
         sem = asyncio.Semaphore(max_in_flight)
         TaskFuture = asyncio.Future[ParsedSectionMetrics | UnprocessedSectionError]
         in_flight_tasks: set[TaskFuture] = set()
@@ -265,8 +272,9 @@ class PipelineOrchestrator:
                 async def _task_wrapper(
                     b: SectionArtifactBundle,
                 ) -> ParsedSectionMetrics | UnprocessedSectionError:
+                    nonlocal pool, pool_restarts, pool_disabled
                     try:
-                        if pool is not None:
+                        if pool is not None and not pool_disabled:
                             try:
                                 res = await loop.run_in_executor(
                                     pool,
@@ -277,20 +285,52 @@ class PipelineOrchestrator:
                                 )
                                 return res
                             except Exception as pool_exc:
-                                logger.warning(
-                                    "Falha no worker pool para seção %s/%s/%s: %s. "
-                                    "Executando fallback local.",
-                                    b.uf,
-                                    b.zona,
-                                    b.secao,
-                                    pool_exc,
-                                )
+                                async with pool_lock:
+                                    if pool is not None and not pool_disabled:
+                                        with contextlib.suppress(Exception):
+                                            pool.shutdown(
+                                                wait=False,
+                                                cancel_futures=True,
+                                            )
+                                        if owns_executor and pool_restarts < 3:
+                                            pool_restarts += 1
+                                            logger.warning(
+                                                "Worker pool degradado para %s (%s). "
+                                                "Reinicializando pool (%d/3)...",
+                                                norm_uf,
+                                                pool_exc,
+                                                pool_restarts,
+                                            )
+                                            try:
+                                                pool = ProcessPoolExecutor(
+                                                    max_workers=self._settings.workers
+                                                )
+                                            except Exception as exc_restart:
+                                                logger.warning(
+                                                    "Incapaz de reiniciar pool: %s. "
+                                                    "Fallback local para %s.",
+                                                    exc_restart,
+                                                    norm_uf,
+                                                )
+                                                pool_disabled = True
+                                                pool = None
+                                        else:
+                                            logger.warning(
+                                                "ProcessPool desativado para %s (%s). "
+                                                "Fallback local nas seções restantes.",
+                                                norm_uf,
+                                                pool_exc,
+                                            )
+                                            pool_disabled = True
+                                            pool = None
+
                                 return _parse_bundle_worker(
                                     b,
                                     self._settings.resources_dir,
                                     profile_name,
                                 )
-                        # Execução no processo local (1 worker)
+
+                        # Execução local quando pool desabilitado ou 1 worker
                         return _parse_bundle_worker(
                             b,
                             self._settings.resources_dir,

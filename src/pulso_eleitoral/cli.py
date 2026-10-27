@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Annotated
 
@@ -207,17 +206,11 @@ def ingest_parse(
             settings.resources_dir / "dim_municipio_fuso.csv"
         )
         orchestrator = PipelineOrchestrator(run_cfg, settings, tz_catalog)
-        shared_pool: ProcessPoolExecutor | None = (
-            ProcessPoolExecutor(max_workers=workers) if workers > 1 else None
-        )
 
         async def _run_all_ufs() -> None:
             for target_uf in run_cfg.ufs:
                 typer.echo(f"[pulso] Processando UF: {target_uf}...")
-                if shared_pool is not None:
-                    summary = await orchestrator.run_uf(target_uf, executor=shared_pool)
-                else:
-                    summary = await orchestrator.run_uf(target_uf)
+                summary = await orchestrator.run_uf(target_uf)
                 if summary.checkpoint_sections > 0:
                     typer.echo(
                         f"[pulso] Concluído {summary.uf}: "
@@ -234,11 +227,7 @@ def ingest_parse(
                         f"erros={summary.error_sections}"
                     )
 
-        try:
-            asyncio.run(_run_all_ufs())
-        finally:
-            if shared_pool is not None:
-                shared_pool.shutdown(wait=True)
+        asyncio.run(_run_all_ufs())
     except Exception as exc:
         typer.echo(f"[pulso erro] Falha em ingest-parse: {exc}", err=True)
         raise typer.Exit(code=1) from exc
