@@ -288,18 +288,10 @@ def _try_decode_with_ber_tlv_walker(bu_raw_bytes: bytes) -> BuReconciliationData
             continue
 
         # Padrao ResultadoVotacaoPorEleicao: [id, aptos, ..., SEQUENCE OF RV]
-        if (
-            len(children) >= 3
-            and children[0][0] == 0x02
-            and children[1][0] == 0x02
-        ):
+        if len(children) >= 3 and children[0][0] == 0x02 and children[1][0] == 0x02:
             id_eleicao = _decode_non_negative_int(children[0][2])
             aptos = _decode_non_negative_int(children[1][2])
-            if (
-                id_eleicao is not None
-                and aptos is not None
-                and 1 <= aptos <= 10_000
-            ):
+            if id_eleicao is not None and aptos is not None and 1 <= aptos <= 10_000:
                 matched_comps: list[int] = []
                 for _, is_const, seq_val in children[2:]:
                     if not is_const:

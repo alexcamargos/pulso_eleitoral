@@ -308,9 +308,7 @@ class PipelineSettings(BaseSettings):
     batch_size: Annotated[int, Field(ge=1)] = 10_000
     max_in_flight_multiplier: Annotated[int, Field(ge=1, le=64)] = 16
     cdn_base_url: str = "https://resultados.tse.jus.br/oficial"
-    open_data_base_url: str = (
-        "https://cdn.tse.jus.br/estatistica/sead/eleicoes"
-    )
+    open_data_base_url: str = "https://cdn.tse.jus.br/estatistica/sead/eleicoes"
     max_concurrent_requests: Annotated[int, Field(ge=1, le=256)] = 32
     requests_per_second: Annotated[float, Field(gt=0.0, le=500.0)] = 50.0
     http_max_connections: Annotated[int, Field(ge=1, le=512)] = 64

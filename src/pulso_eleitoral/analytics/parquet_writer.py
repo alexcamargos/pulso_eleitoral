@@ -141,7 +141,7 @@ class ParquetBatchWriter:
             stem = entry.stem
             if stem.endswith(".tmp"):
                 continue
-            suffix = stem[len(prefix):]
+            suffix = stem[len(prefix) :]
             if suffix.isdigit():
                 max_id = max(max_id, int(suffix))
         return max_id + 1
