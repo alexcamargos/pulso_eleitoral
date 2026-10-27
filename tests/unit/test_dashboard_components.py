@@ -1,7 +1,7 @@
 """Testes unitários para os componentes visuais do dashboard.
 
 Valida a sanitização HTML via clean_html e a invocação dos componentes
-principais de visualização no padrão Margem Eleitoral.
+principais de visualização do dashboard.
 """
 
 from __future__ import annotations
@@ -9,6 +9,10 @@ from __future__ import annotations
 import pandas as pd
 from pytest_mock import MockerFixture
 
+from pulso_eleitoral.contracts.models import (
+    ParametricRegressionResult,
+    SensitivityBoundsResult,
+)
 from pulso_eleitoral.dashboard.components.executive_story_cards import (
     render_executive_story_cards,
 )
@@ -41,6 +45,22 @@ def test_clean_html_strips_indents_and_comments() -> None:
     assert cleaned == '<div class="test"><span>Conteúdo</span></div>'
 
 
+def test_clean_html_preserves_spaces_between_words_and_tags() -> None:
+    """Verifica se clean_html preserva espaços entre palavras e tags textuais."""
+    raw_html = """
+    <div class="info">
+        Palavra inicial
+        segunda palavra após quebra
+        e tag <strong>destacada</strong> em linha.
+        Ponto final. Nova frase.
+    </div>
+    """
+    cleaned = clean_html(raw_html)
+    assert "Palavra inicial segunda palavra" in cleaned
+    assert "e tag <strong>destacada</strong> em linha." in cleaned
+    assert "Ponto final. Nova frase." in cleaned
+
+
 def test_apply_custom_styles(mocker: MockerFixture) -> None:
     """Verifica se apply_custom_styles injeta o CSS no Streamlit via st.html."""
     mock_html = mocker.patch("streamlit.html")
@@ -52,7 +72,12 @@ def test_render_executive_story_cards(mocker: MockerFixture) -> None:
     """Verifica a renderização dos cartões executivos da hero section."""
     mocker.patch("streamlit.html")
     mock_col = mocker.MagicMock()
-    mocker.patch("streamlit.columns", return_value=[mock_col, mock_col, mock_col])
+    mocker.patch(
+        "streamlit.columns",
+        side_effect=lambda spec, **kwargs: [
+            mock_col for _ in range(len(spec) if isinstance(spec, list) else spec)
+        ],
+    )
 
     kpis = {
         "total_votos_brasil": 127635809,
@@ -74,7 +99,12 @@ def test_render_timeline_tab(mocker: MockerFixture) -> None:
     mocker.patch("streamlit.html")
     mocker.patch("streamlit.plotly_chart")
     mock_col = mocker.MagicMock()
-    mocker.patch("streamlit.columns", return_value=[mock_col, mock_col, mock_col])
+    mocker.patch(
+        "streamlit.columns",
+        side_effect=lambda spec, **kwargs: [
+            mock_col for _ in range(len(spec) if isinstance(spec, list) else spec)
+        ],
+    )
 
     df_timeline = pd.DataFrame(
         [
@@ -153,12 +183,47 @@ def test_render_verdict_tab(mocker: MockerFixture) -> None:
     mocker.patch("streamlit.latex")
     mocker.patch("streamlit.selectbox", return_value="Todas")
     mocker.patch("streamlit.text_input", return_value="")
+    mocker.patch("streamlit.number_input", return_value=2_139_645)
+    mocker.patch("streamlit.caption")
     mocker.patch("streamlit.dataframe")
     mock_col = mocker.MagicMock()
-    mocker.patch("streamlit.columns", return_value=[mock_col, mock_col])
+    mocker.patch(
+        "streamlit.columns",
+        side_effect=lambda spec, **kwargs: [
+            mock_col for _ in range(len(spec) if isinstance(spec, list) else spec)
+        ],
+    )
     mocker.patch(
         "pulso_eleitoral.dashboard.components.verdict_tab.get_latest_sections",
         return_value=pd.DataFrame([{"municipio": "São Paulo", "votos": 10}]),
+    )
+    mock_bounds = SensitivityBoundsResult(
+        total_votos_analisados=127635809,
+        votos_pos_17h=35972,
+        pct_pos_17h=0.0282,
+        margem_eleitoral_referencia=2139645,
+        impacto_maximo_possivel_votos=35972,
+        impacto_maximo_pct_margem=1.6812,
+        risco_inversao_resultado=False,
+        veredito_deterministico="Aprovado sem risco.",
+    )
+    mock_param = ParametricRegressionResult(
+        beta_pos_17h=0.0,
+        std_err_cluster=0.001,
+        t_statistic=0.0,
+        p_value=1.0,
+        ci_95_lower=-0.002,
+        ci_95_upper=0.002,
+        r_squared_within=0.0,
+        n_secoes=497624,
+        n_municipios=5567,
+        votos_liquidos_deslocados_estimados=0,
+        candidato_favorecido="NEUTRO",
+        conclusao_estatistica="Sem viés detectável.",
+    )
+    mocker.patch(
+        "pulso_eleitoral.dashboard.components.verdict_tab.get_electoral_impact_data",
+        return_value=(mock_bounds, mock_param),
     )
 
     render_verdict_tab(db_path=":memory:")

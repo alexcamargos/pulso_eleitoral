@@ -1,12 +1,14 @@
 """Definição de estilos CSS customizados e identidade visual do dashboard.
 
-Configura a paleta de cores institucional inspirada no projeto Margem Eleitoral:
-fundo dark slate (#0E1117 / #121417), cartões em dark charcoal (#181B20),
-bordas refinadas (#282D37), destaque primário em Sky Blue (#38BDF8) e
-acentos de integridade (#10B981, #F59E0B, #EF4444).
+Configura a paleta de cores institucional do dashboard: fundo dark slate
+(#0E1117 / #121417), cartões em dark charcoal (#181B20), bordas refinadas
+(#282D37), destaque primário em Sky Blue (#38BDF8) e acentos de integridade
+(#10B981, #F59E0B, #EF4444).
 """
 
 from __future__ import annotations
+
+import re
 
 import streamlit as st
 
@@ -86,10 +88,12 @@ DASHBOARD_CSS = """
     border-radius: 10px;
     padding: 18px 20px;
     height: 100%;
+    min-height: 140px;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    overflow: visible;
 }
 
 .hero-card:hover {
@@ -150,7 +154,7 @@ DASHBOARD_CSS = """
     line-height: 1.4;
 }
 
-/* Customização refinada das Abas (stTabs) padrão Margem Eleitoral */
+/* Customização refinada das Abas (stTabs) */
 .stTabs [data-baseweb="tab-list"],
 div[data-testid="stTabs"] [data-baseweb="tab-list"] {
     gap: 6px !important;
@@ -189,6 +193,7 @@ button[data-baseweb="tab"][aria-selected="true"] p {
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 14px;
+    overflow: visible;
 }
 
 .info-box-title {
@@ -219,8 +224,8 @@ button[data-baseweb="tab"][aria-selected="true"] p {
 def clean_html(html_str: str) -> str:
     """Higieniza e compacta strings HTML para renderização nativa segura no Streamlit.
 
-    Remove quebras de linha e recuos que fazem o analisador CommonMark do Streamlit
-    interpretar o markup HTML como bloco de código pré-formatado (indent code block).
+    Remove comentários HTML, recuos e quebras de linha preservando o espaçamento
+    correto entre palavras e tags textuais para evitar aglutinação indevida.
 
     Args:
         html_str: String de markup HTML com potenciais quebras de linha e recuos.
@@ -231,12 +236,19 @@ def clean_html(html_str: str) -> str:
     Raises:
         Nenhum.
     """
-    lines = [
-        line.strip()
-        for line in html_str.splitlines()
-        if line.strip() and not line.strip().startswith("<!--")
-    ]
-    return "".join(lines)
+    cleaned = re.sub(r"<!--.*?-->", "", html_str, flags=re.DOTALL)
+    lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
+    if not lines:
+        return ""
+
+    result: list[str] = [lines[0]]
+    for line in lines[1:]:
+        prev = result[-1]
+        if not prev.endswith(">") or not line.startswith("<"):
+            result.append(" ")
+        result.append(line)
+
+    return "".join(result)
 
 
 def apply_custom_styles() -> None:
