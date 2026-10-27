@@ -1,9 +1,29 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { GeographyPayload, GeographyPointItem, CapitalRankingItem, AmazonRankingItem } from "../types/audit";
+import dynamic from "next/dynamic";
+import { GeographyPayload, CapitalRankingItem, AmazonRankingItem } from "../types/audit";
 import { formatNumber } from "../lib/api";
 import { Search } from "lucide-react";
+
+// Importação dinâmica do mapa Leaflet desabilitando SSR para suportar exportação estática
+const BrazilMap = dynamic(
+  () => import("./BrazilMap").then((mod) => mod.BrazilMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="w-full h-[480px] sm:h-[520px] rounded-lg border border-[#282D37] flex items-center justify-center text-xs text-[#94A3B8]"
+        style={{ backgroundColor: "#121417" }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full border-2 border-[#38BDF8] border-t-transparent animate-spin" />
+          <span>Carregando mapa geoespacial do Brasil...</span>
+        </div>
+      </div>
+    ),
+  }
+);
 
 interface GeographyTabProps {
   data: GeographyPayload | null;
@@ -22,7 +42,6 @@ const HORARIOS_SCRUBBER = [
 export const GeographyTab: React.FC<GeographyTabProps> = ({ data, loading }) => {
   const [scrubberIndex, setScrubberIndex] = useState<number>(5); // Padrão: Janela Completa (19:06)
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [hoveredPoint, setHoveredPoint] = useState<GeographyPointItem | null>(null);
 
   const points = data?.points || [];
   const capitais = data?.capitais || [];
@@ -36,20 +55,11 @@ export const GeographyTab: React.FC<GeographyTabProps> = ({ data, loading }) => 
       const matchTempo = pt.ultimo_voto_str <= `${limiteHorario}:59`;
       const matchBusca =
         !searchTerm ||
-        pt.municipio_nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pt.uf.toLowerCase().includes(searchTerm.toLowerCase());
+        pt.municipio_nome.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
+        pt.uf.toLowerCase() === searchTerm.toLowerCase().trim();
       return matchTempo && matchBusca;
     });
   }, [points, limiteHorario, searchTerm]);
-
-  // Projeção Mercator simplificada do território brasileiro
-  // Longitude: -74 (Oeste) a -34 (Leste) -> Largura 40 graus
-  // Latitude: +5 (Norte) a -34 (Sul) -> Altura 39 graus
-  const mapWidth = 600;
-  const mapHeight = 500;
-
-  const projectLon = (lon: number) => ((lon - -74) / 40) * mapWidth;
-  const projectLat = (lat: number) => ((5 - lat) / 39) * mapHeight;
 
   // Ranking Capitais Fallback
   const topCapitais: CapitalRankingItem[] =
@@ -144,7 +154,7 @@ export const GeographyTab: React.FC<GeographyTabProps> = ({ data, loading }) => 
             <input
               id="search-mun"
               type="text"
-              placeholder="Ex: São Paulo, Lábrea, AC..."
+              placeholder="Ex: São Paulo, Capelinha, Lábrea, MG..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-[#121417] text-xs text-[#F8FAFC] pl-9 pr-3 py-2 rounded-lg border border-[#282D37] focus:border-[#38BDF8] outline-none"
@@ -153,80 +163,30 @@ export const GeographyTab: React.FC<GeographyTabProps> = ({ data, loading }) => 
         </div>
       </div>
 
-      {/* 3. Mapa Geoespacial e Tooltip */}
+      {/* 3. Mapa Geoespacial Real Leaflet */}
       <div className="bg-[#181B20] border border-[#282D37] rounded-xl p-4 relative overflow-hidden">
-        <div className="flex justify-between items-center mb-2">
+        <div className="flex justify-between items-center mb-2.5">
           <div className="text-xs text-[#94A3B8]">
             Exibindo <strong className="text-[#38BDF8]">{filteredPoints.length.toLocaleString("pt-BR")}</strong> de{" "}
             <strong>{points.length.toLocaleString("pt-BR")}</strong> municípios georreferenciados com seções encerradas até{" "}
             <strong className="text-[#F8FAFC]">{limiteHorario} BRT</strong>.
+            {searchTerm && (
+              <span className="ml-2 text-[#F59E0B] font-semibold">
+                (Filtro: &ldquo;{searchTerm}&rdquo;)
+              </span>
+            )}
           </div>
-          <div className="text-[11px] text-[#64748B]">Projeção Nacional BRT</div>
+          <div className="text-[11px] text-[#64748B] hidden sm:block">
+            Navegue com zoom e arraste &bull; Clique nos pontos para detalhes
+          </div>
         </div>
 
-        <div className="relative flex justify-center bg-[#121417] rounded-lg p-2 border border-[#282D37]/60 overflow-hidden">
-          <svg
-            viewBox={`0 0 ${mapWidth} ${mapHeight}`}
-            className="w-full max-w-[650px] h-auto select-none"
-          >
-            {/* Contorno simplificado do Brasil */}
-            <path
-              d="M 120,40 Q 240,25 340,90 Q 420,110 520,160 Q 560,220 530,280 Q 480,380 380,440 Q 300,480 260,490 Q 220,440 240,360 Q 210,310 140,290 Q 70,240 80,180 Q 70,110 120,40 Z"
-              fill="#181B20"
-              stroke="#282D37"
-              strokeWidth="1.5"
-            />
-
-            {/* Linhas de fuso discretas */}
-            <line x1={projectLon(-45)} y1={0} x2={projectLon(-45)} y2={mapHeight} stroke="#282D37" strokeDasharray="3,3" opacity={0.5} />
-            <line x1={projectLon(-60)} y1={0} x2={projectLon(-60)} y2={mapHeight} stroke="#282D37" strokeDasharray="3,3" opacity={0.5} />
-
-            {/* Pontos Municipais Georreferenciados */}
-            {filteredPoints.map((pt, i) => {
-              const cx = projectLon(pt.longitude);
-              const cy = projectLat(pt.latitude);
-              // Raio proporcional calibrado
-              const r = Math.min(Math.max(2.5, Math.sqrt(pt.votos_pos) * 1.8), 24);
-              const isHovered = hoveredPoint?.municipio_nome === pt.municipio_nome && hoveredPoint?.uf === pt.uf;
-
-              return (
-                <circle
-                  key={`${pt.municipio_nome}-${pt.uf}-${i}`}
-                  cx={cx}
-                  cy={cy}
-                  r={r}
-                  fill="#38BDF8"
-                  fillOpacity={isHovered ? 0.9 : 0.45}
-                  stroke={isHovered ? "#F8FAFC" : "#0284C7"}
-                  strokeWidth={isHovered ? 2 : 1}
-                  className="cursor-pointer transition-all"
-                  onMouseEnter={() => setHoveredPoint(pt)}
-                  onMouseLeave={() => setHoveredPoint(null)}
-                />
-              );
-            })}
-          </svg>
-
-          {/* Tooltip Flutuante estilo Streamlit/Pydeck */}
-          {hoveredPoint && (
-            <div className="absolute top-4 right-4 bg-[#181B20] border border-[#38BDF8] p-3 rounded-lg shadow-2xl text-xs z-20 min-w-[200px]">
-              <div className="font-bold text-[#F8FAFC] border-b border-[#282D37] pb-1.5 mb-1.5">
-                {hoveredPoint.municipio_nome} - {hoveredPoint.uf}
-              </div>
-              <div className="space-y-1 text-[#94A3B8]">
-                <div>
-                  Votos pós-17h: <strong className="text-[#38BDF8]">{formatNumber(hoveredPoint.votos_pos)}</strong>
-                </div>
-                <div>
-                  Fatia do município: <strong className="text-[#CBD5E1]">{hoveredPoint.pct_apos_17h.toFixed(3)}%</strong>
-                </div>
-                <div>
-                  Último voto: <strong className="text-[#F8FAFC] font-mono">{hoveredPoint.ultimo_voto_str} BRT</strong>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Componente Leaflet Map */}
+        <BrazilMap
+          points={filteredPoints}
+          searchTerm={searchTerm}
+          limiteHorario={limiteHorario}
+        />
       </div>
 
       {/* 4. Confronto dos Dois Eixos (Rankings Lado a Lado) */}
