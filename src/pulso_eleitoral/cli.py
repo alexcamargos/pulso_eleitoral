@@ -459,6 +459,57 @@ def run_all(
     typer.echo("[pulso pipeline] Execução concluída e auditada com sucesso!")
 
 
+@app.command("dashboard")
+def dashboard(
+    port: Annotated[
+        int,
+        typer.Option("--port", "-p", help="Porta HTTP para o servidor Streamlit."),
+    ] = 8501,
+    host: Annotated[
+        str,
+        typer.Option("--host", "-h", help="Endereço de rede para escuta."),
+    ] = "localhost",
+) -> None:
+    """Inicia o dashboard analítico interativo do Pulso Eleitoral no Streamlit.
+
+    Args:
+        port: Porta de escuta do servidor web (padrão: 8501).
+        host: Interface de rede para ligação (padrão: localhost).
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        typer.Exit: Caso ocorra erro na inicialização do Streamlit.
+    """
+    import subprocess
+    import sys
+
+    app_file = Path(__file__).parent / "dashboard" / "app.py"
+    typer.echo(
+        f"[pulso dashboard] Iniciando interface visual em http://{host}:{port}..."
+    )
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "streamlit",
+        "run",
+        str(app_file),
+        "--server.port",
+        str(port),
+        "--server.address",
+        host,
+    ]
+    try:
+        subprocess.run(cmd, check=True)
+    except KeyboardInterrupt:
+        typer.echo("\n[pulso dashboard] Servidor encerrado pelo usuário.")
+    except Exception as exc:
+        typer.echo(f"[pulso dashboard] Erro na execução do dashboard: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+
 def main() -> None:
     """Entrypoint principal registrado em `[project.scripts]` (`pulso`).
 
