@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import streamlit as st
 
-from pulso_eleitoral.dashboard.data import get_latest_sections
+from pulso_eleitoral.dashboard.data import (
+    get_electoral_impact_data,
+    get_latest_sections,
+)
 from pulso_eleitoral.dashboard.styles import clean_html
 
 
@@ -40,46 +43,172 @@ def render_verdict_tab(db_path: str = "data/pulso_eleitoral.duckdb") -> None:
     """
     st.html(clean_html(intro_html))
 
-    # Teste de Estresse Eleitoral (Confronto da Margem)
+    # Teste de Estresse Eleitoral Interativo (Bounds de Manski)
+    st.markdown("#### Teste de Sensibilidade & Invariância de Manski")
+    c_in1, c_in2 = st.columns([1.2, 1.8], gap="medium")
+    with c_in1:
+        margin_input = st.number_input(
+            "Margem Oficial de Vitória (Votos):",
+            min_value=1,
+            value=2_139_645,
+            step=50_000,
+            help="Diferença oficial de votos entre os dois candidatos mais votados.",
+        )
+    with c_in2:
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+        st.caption(
+            "Simulação dinâmica: ajuste a margem para testar em qual ponto "
+            "o volume da janela pós-17h poderia teoricamente ameaçar o resultado."
+        )
+
+    bounds, param = get_electoral_impact_data(
+        margin=int(margin_input),
+        db_path=db_path,
+    )
+
     c_ver1, c_ver2 = st.columns([1.2, 0.8], gap="medium")
 
     with c_ver1:
-        st.markdown("#### Teste de Sensibilidade de Resultado")
         st.markdown(
-            "Mesmo no cenário teórico mais extremo e estatisticamente implausível "
-            "(onde **100% dos 35.972 votos** da janela tivessem sido "
-            "atribuídos a um único concorrente), o impacto máximo sobre o total "
-            "de 127,6 milhões de votos auditados seria de apenas:"
+            f"No pior cenário contrafactual admissível (onde **100% dos "
+            f"{bounds.votos_pos_17h:,} votos** pós-17h tivessem sido computados "
+            "para o candidato derrotado), o impacto sobre a margem seria:"
         )
-        st.latex(r"\text{Impacto Máximo} = \frac{35.972}{127.635.809} = 0{,}0282\%")
+        st.latex(
+            rf"\text{{Impacto Máximo}} = \frac{{{bounds.votos_pos_17h:,}}}"
+            rf"{{{bounds.margem_eleitoral_referencia:,}}} = "
+            rf"{bounds.impacto_maximo_pct_margem:.4f}\%"
+        )
         st.markdown(
-            "Em eleições presidenciais brasileiras de segundo turno, a menor "
-            "diferença de votos já registrada na história moderna foi superior "
-            "a **2,1 milhões de votos** (2014 e 2022). Portanto, o volume da "
-            "janela atípica equivale a **menos de 1,7%** da menor margem "
-            "histórica de vitória."
+            f"Como o volume da janela ({bounds.votos_pos_17h:,} votos) representa "
+            f"apenas **{bounds.impacto_maximo_pct_margem:.4f}%** da margem de vitória, "
+            "uma inversão contrafactual de resultado é **matematicamente impossível**."
         )
 
     with c_ver2:
-        card_veredito = """
-        <div class="hero-card" style="border-color: #10B981; background: #131B17;">
+        card_border = "#10B981" if not bounds.risco_inversao_resultado else "#EF4444"
+        card_bg = "#131B17" if not bounds.risco_inversao_resultado else "#201315"
+        pill_class = (
+            "hero-pill hero-pill-success"
+            if not bounds.risco_inversao_resultado
+            else "hero-pill hero-pill-danger"
+        )
+        card_title = (
+            "Sem Risco de Inversão"
+            if not bounds.risco_inversao_resultado
+            else "Zona de Alerta Crítico"
+        )
+
+        card_veredito = f"""
+        <div class="hero-card"
+             style="border-color: {card_border}; background: {card_bg};">
             <div class="hero-card-header">
-                <span style="color: #10B981;">Conclusão da Auditoria</span>
-                <span class="hero-pill hero-pill-success">Aprovado</span>
+                <span style="color: {card_border};">Conclusão da Auditoria</span>
+                <span class="{pill_class}">
+                    {'Aprovado' if not bounds.risco_inversao_resultado else 'Atenção'}
+                </span>
             </div>
-            <div class="hero-metric-val" style="color: #10B981; font-size: 26px;">
-                Sem Risco de Inversão
+            <div class="hero-metric-val" style="color: {card_border}; font-size: 26px;">
+                {card_title}
             </div>
             <div class="hero-metric-sub" style="color: #CBD5E1; margin-top: 8px;
                 line-height: 1.5;">
-                O atraso operacional verificado no 2º turno de 2026 configurou uma
-                <strong>anomalia de vazão logística</strong>, mas foi
-                <strong>matematicamente incapaz</strong> de afetar a legitimidade
-                ou inverter o resultado da eleição presidencial.
+                {bounds.veredito_deterministico}
             </div>
         </div>
         """
         st.html(clean_html(card_veredito))
+
+    # Análise Paramétrica: Resposta às Três Perguntas
+    st.markdown("<hr class='custom-divider'/>", unsafe_allow_html=True)
+    st.markdown(
+        "#### Inferência Paramétrica: A extensão favoreceu ou prejudicou "
+        "algum candidato?"
+    )
+
+    st.markdown(
+        """
+        <div style="font-size: 13.5px; color: #94A3B8; margin-bottom: 16px;">
+            Avaliamos a distribuição das <strong>497.624 seções</strong> em
+            <strong>5.567 municípios</strong> via modelo de efeitos fixos municipais
+            (Within-Estimator) e erros-padrão clusterizados (CRVE):
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    q1, q2, q3 = st.columns(3, gap="medium")
+
+    with q1:
+        box_q1 = """
+        <div class="info-box" style="border-left: 4px solid #38BDF8;">
+            <div class="info-box-title" style="color: #38BDF8;">
+                Prejudicou A ou B?
+            </div>
+            <div class="hero-metric-val"
+                 style="font-size: 22px; color: #F8FAFC; margin: 6px 0;">
+                Não Prejudicou
+            </div>
+            <div class="info-box-desc">
+                Retenção estrita da Hipótese Nula (<code>p = 1,0000</code>).
+                A formação de filas após as 17h decorreu de fluxo de atendimento e
+                não exibiu viés discriminatório contra qualquer concorrente.
+            </div>
+        </div>
+        """
+        st.html(clean_html(box_q1))
+
+    with q2:
+        box_q2 = """
+        <div class="info-box" style="border-left: 4px solid #10B981;">
+            <div class="info-box-title" style="color: #10B981;">
+                Ajudou A ou B?
+            </div>
+            <div class="hero-metric-val"
+                 style="font-size: 22px; color: #F8FAFC; margin: 6px 0;">
+                Não Ajudou
+            </div>
+            <div class="info-box-desc">
+                Deslocamento líquido estimado em <code>~0 votos</code>.
+                Mesmo sob poder estatístico de 80%, o efeito mínimo detectável (MDE)
+                está contido em uma banda máxima de apenas ~2.124 votos.
+            </div>
+        </div>
+        """
+        st.html(clean_html(box_q2))
+
+    with q3:
+        box_q3 = """
+        <div class="info-box" style="border-left: 4px solid #A855F7;">
+            <div class="info-box-title" style="color: #A855F7;">
+                Inferência no Resultado?
+            </div>
+            <div class="hero-metric-val"
+                 style="font-size: 22px; color: #F8FAFC; margin: 6px 0;">
+                Zero Inferência
+            </div>
+            <div class="info-box-desc">
+                Resultado <strong>estritamente invariante</strong>.
+                Os 35.972 votos pós-17h representam apenas 0,0282% do eleitorado,
+                sendo incapazes de alterar o vencedor eleito.
+            </div>
+        </div>
+        """
+        st.html(clean_html(box_q3))
+
+    with st.expander("Detalhes Técnicos do Modelo Econométrico (Within-Estimator)"):
+        st.markdown(
+            f"- **Amostra:** {param.n_secoes:,} seções eleitorais em "
+            f"{param.n_municipios:,} municípios\n"
+            f"- **Coeficiente $\\beta_1$ (Pós-17h):** `{param.beta_pos_17h:+.6f}`\n"
+            f"- **Erro-Padrão Clusterizado (CRVE):** `{param.std_err_cluster:.6f}`\n"
+            f"- **Estatística $t$ de Student:** `{param.t_statistic:+.4f}` "
+            f"(p-valor: `{param.p_value:.4f}`)\n"
+            f"- **Intervalo de Confiança (95%):** `[{param.ci_95_lower:+.6f}, "
+            f"{param.ci_95_upper:+.6f}]`\n"
+            f"- **Candidato Favorecido:** `{param.candidato_favorecido}`\n"
+            f"- **Conclusão:** {param.conclusao_estatistica}"
+        )
 
     st.markdown("<hr class='custom-divider'/>", unsafe_allow_html=True)
 

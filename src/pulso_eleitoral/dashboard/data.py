@@ -12,6 +12,15 @@ import duckdb
 import pandas as pd
 import streamlit as st
 
+from pulso_eleitoral.analytics.electoral_impact import (
+    calculate_manski_sensitivity_bounds,
+    run_parametric_bias_model,
+)
+from pulso_eleitoral.contracts.models import (
+    ParametricRegressionResult,
+    SensitivityBoundsResult,
+)
+
 
 @st.cache_resource
 def get_duckdb_connection(
@@ -412,3 +421,26 @@ def get_latest_sections(
     LIMIT {limit}
     """
     return con.execute(q).df()
+
+
+@st.cache_data(ttl=3600)
+def get_electoral_impact_data(
+    margin: int = 2_139_645,
+    db_path: str = "data/pulso_eleitoral.duckdb",
+) -> tuple[SensitivityBoundsResult, ParametricRegressionResult]:
+    """Obtém as métricas do teste paramétrico e bounds de Manski para o dashboard.
+
+    Args:
+        margin: Margem absoluta oficial de vitória no pleito.
+        db_path: Caminho do banco DuckDB.
+
+    Returns:
+        Tupla com `(SensitivityBoundsResult, ParametricRegressionResult)`.
+
+    Raises:
+        duckdb.Error: Se a consulta ao banco falhar.
+    """
+    con = get_duckdb_connection(db_path)
+    bounds = calculate_manski_sensitivity_bounds(con, margin=margin)
+    param = run_parametric_bias_model(con)
+    return bounds, param
