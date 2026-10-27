@@ -24,6 +24,7 @@ import typer
 
 from pulso_eleitoral import __version__
 from pulso_eleitoral.analytics.consolidator import DuckDbConsolidator
+from pulso_eleitoral.analytics.electoral_impact import generate_electoral_impact_report
 from pulso_eleitoral.analytics.orchestrator import PipelineOrchestrator
 from pulso_eleitoral.analytics.verifier import PipelineVerifier
 from pulso_eleitoral.config import (
@@ -508,6 +509,137 @@ def dashboard(
     except Exception as exc:
         typer.echo(f"[pulso dashboard] Erro na execução do dashboard: {exc}", err=True)
         raise typer.Exit(code=1) from exc
+
+
+@app.command("test-impact")
+def audit_electoral_impact(
+    db_path: Annotated[
+        Path,
+        typer.Option("--db-path", help="Caminho do banco DuckDB consolidado."),
+    ] = Path("data/pulso_eleitoral.duckdb"),
+    margin: Annotated[
+        int,
+        typer.Option(
+            "--margin",
+            "-m",
+            help="Margem absoluta oficial de vitória entre os dois candidatos.",
+        ),
+    ] = 2_139_645,
+    candidate_csv: Annotated[
+        Path | None,
+        typer.Option(
+            "--candidate-csv",
+            help="Caminho para CSV opcional com votos nominais por seção.",
+        ),
+    ] = None,
+    cand_a_name: Annotated[
+        str,
+        typer.Option("--cand-a", help="Nome do Candidato A."),
+    ] = "Candidato A",
+    cand_b_name: Annotated[
+        str,
+        typer.Option("--cand-b", help="Nome do Candidato B."),
+    ] = "Candidato B",
+    alpha: Annotated[
+        float,
+        typer.Option("--alpha", help="Nível de significância estatística."),
+    ] = 0.05,
+) -> None:
+    """Executa o teste paramétrico e determinístico de impacto eleitoral pós-17h.
+
+    Avalia a invariância do resultado via Bounds de Manski e o viés marginal
+    da extensão por meio de modelo econométrico de efeitos fixos municipais.
+
+    Args:
+        db_path: Caminho do banco DuckDB.
+        margin: Margem absoluta de votos da vitória.
+        candidate_csv: CSV opcional com votos nominais por seção.
+        cand_a_name: Nome do candidato A.
+        cand_b_name: Nome do candidato B.
+        alpha: Nível de significância estatística do teste bicaudal.
+
+    Returns:
+        Nenhum.
+
+    Raises:
+        typer.Exit: Caso ocorra erro na execução da auditoria estatística.
+    """
+    if not db_path.exists():
+        typer.echo(
+            f"[pulso test-impact] Erro: Banco '{db_path}' não encontrado. "
+            "Execute 'pulso consolidate' antes de rodar o teste.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    typer.echo(
+        f"\n[pulso test-impact] Iniciando auditoria em '{db_path}'..."
+    )
+    try:
+        report = generate_electoral_impact_report(
+            db_path=db_path,
+            margin=margin,
+            candidate_csv_path=candidate_csv,
+            alpha=alpha,
+            candidate_a_name=cand_a_name,
+            candidate_b_name=cand_b_name,
+        )
+    except Exception as exc:
+        typer.echo(
+            f"[pulso test-impact] Falha na auditoria estatística: {exc}",
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
+
+    bounds = report.bounds
+    param = report.parametric
+    data_str = report.timestamp_analise.strftime("%d/%m/%Y %H:%M:%S UTC")
+    risco_txt = (
+        "ALTO RISCO (REQUER ANÁLISE)"
+        if bounds.risco_inversao_resultado
+        else "INEXISTENTE (MATEMATICAMENTE IMPOSSÍVEL)"
+    )
+
+    typer.echo("\n" + "=" * 76)
+    typer.echo("       PULSO ELEITORAL: AUDITORIA DE IMPACTO NA ELEIÇÃO PRESIDENCIAL")
+    typer.echo("=" * 76)
+    typer.echo(f"Data da Análise       : {data_str}")
+    typer.echo(f"Eleição Auditada      : {report.ano_eleicao} (Turno {report.turno})")
+    typer.echo(f"Total de Votos        : {bounds.total_votos_analisados:,}")
+    typer.echo(
+        f"Votos Pós-17h         : {bounds.votos_pos_17h:,} "
+        f"({bounds.pct_pos_17h:.4f}% do eleitorado)"
+    )
+    typer.echo(f"Margem Oficial        : {bounds.margem_eleitoral_referencia:,} votos")
+    typer.echo(f"Impacto Máx. na Margem: {bounds.impacto_maximo_pct_margem:.4f}%")
+    typer.echo(f"Risco de Inversão     : {risco_txt}")
+    typer.echo("-" * 76)
+    typer.echo("1. VEREDITO DETERMINÍSTICO (LIMITES EXTREMOS DE MANSKI):")
+    typer.echo(f"   {bounds.veredito_deterministico}")
+    typer.echo("-" * 76)
+
+    if param:
+        typer.echo("2. INFERÊNCIA PARAMÉTRICA (EFEITOS FIXOS MUNICIPAIS & TESTE t):")
+        typer.echo(
+            f"   Amostra                : {param.n_secoes:,} seções em "
+            f"{param.n_municipios:,} municípios"
+        )
+        typer.echo(f"   Coeficiente Beta (Pós) : {param.beta_pos_17h:+.6f}")
+        typer.echo(f"   Erro-Padrão Cluster    : {param.std_err_cluster:.6f}")
+        typer.echo(f"   Estatística t          : {param.t_statistic:+.4f}")
+        typer.echo(f"   Valor-p (Bicaudal)     : {param.p_value:.6f}")
+        typer.echo(
+            f"   IC 95% do Coeficiente  : [{param.ci_95_lower:+.6f}, "
+            f"{param.ci_95_upper:+.6f}]"
+        )
+        typer.echo(
+            f"   Deslocamento Estimado  : "
+            f"~{param.votos_liquidos_deslocados_estimados:,.1f} votos"
+        )
+        typer.echo(f"   Candidato Favorecido   : {param.candidato_favorecido}")
+        typer.echo(f"   Conclusão Estatística  : {param.conclusao_estatistica}")
+
+    typer.echo("=" * 76 + "\n")
 
 
 def main() -> None:
