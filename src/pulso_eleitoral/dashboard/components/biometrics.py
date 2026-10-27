@@ -24,7 +24,7 @@ def render_biometrics(bio_data: dict[str, Any]) -> None:
     Raises:
         Nenhum.
     """
-    st.markdown(
+    st.html(
         """
         <div class="section-tag">Integridade</div>
         <h2 class="section-title">Como os eleitores foram autenticados na urna</h2>
@@ -32,8 +32,7 @@ def render_biometrics(bio_data: dict[str, Any]) -> None:
             Uma questão técnica primordial em horários estendidos é auditar se
             houve relaxamento nas regras de validação biométrica pelo mesário.
         </p>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
     if not bio_data:
@@ -119,4 +118,4 @@ def render_biometrics(bio_data: dict[str, Any]) -> None:
             "desordenada."
             "</div></div>"
         )
-        st.markdown(card_html, unsafe_allow_html=True)
+        st.html(card_html)

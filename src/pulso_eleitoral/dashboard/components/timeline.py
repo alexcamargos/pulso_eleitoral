@@ -23,7 +23,7 @@ def render_timeline(df_timeline: pd.DataFrame) -> None:
     Raises:
         Nenhum.
     """
-    st.markdown(
+    st.html(
         """
         <div class="section-tag">Quando</div>
         <h2 class="section-title">A física do fluxo: como os votos entraram</h2>
@@ -34,8 +34,7 @@ def render_timeline(df_timeline: pd.DataFrame) -> None:
             de extensão</strong> entre 17h45 e 18h30 (com picos de até 170 votos/min),
             esgotando-se gradualmente até as 19h06.
         </p>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
     if df_timeline.empty:
@@ -169,7 +168,7 @@ def render_timeline(df_timeline: pd.DataFrame) -> None:
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown(
+        st.html(
             """
             <div class="method-card">
                 <span class="method-tag">17h00 às 17h14</span>
@@ -180,12 +179,11 @@ def render_timeline(df_timeline: pd.DataFrame) -> None:
                     eleitores que já estavam no recinto antes do fechamento.
                 </p>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
 
     with col2:
-        st.markdown(
+        st.html(
             """
             <div class="method-card">
                 <span class="method-tag">17h45 às 18h30</span>
@@ -196,12 +194,11 @@ def render_timeline(df_timeline: pd.DataFrame) -> None:
                     estendida ou enfrentou lentidão extraordinária.
                 </p>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
 
     with col3:
-        st.markdown(
+        st.html(
             """
             <div class="method-card">
                 <span class="method-tag">Cadência da Cabine</span>
@@ -211,6 +208,5 @@ def render_timeline(df_timeline: pd.DataFrame) -> None:
                     comprovando votação humana contínua e sem injeção anormal em lote.
                 </p>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )

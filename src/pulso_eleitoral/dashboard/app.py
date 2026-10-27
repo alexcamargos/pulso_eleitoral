@@ -56,27 +56,27 @@ def main() -> None:
     # Ato 1: Hero e KPIs Monumentais
     render_hero(kpis)
 
-    st.markdown("<hr class='custom-divider'/>", unsafe_allow_html=True)
+    st.html("<hr class='custom-divider'/>")
 
     # Ato 2: Curva de Vazão Minuto a Minuto (Física do Fluxo)
     render_timeline(df_timeline)
 
-    st.markdown("<hr class='custom-divider'/>", unsafe_allow_html=True)
+    st.html("<hr class='custom-divider'/>")
 
     # Ato 3: Onde Aconteceu (Mapa Interativo & Scrubber Temporal)
     render_map_view(df_map)
 
-    st.markdown("<hr class='custom-divider'/>", unsafe_allow_html=True)
+    st.html("<hr class='custom-divider'/>")
 
     # Ato 4: Rankings Regionais (Capitais vs Municípios de Maior Impacto)
     render_rankings(df_capitais, df_proporcao)
 
-    st.markdown("<hr class='custom-divider'/>", unsafe_allow_html=True)
+    st.html("<hr class='custom-divider'/>")
 
     # Ato 5: Integridade Biometria vs. Manual
     render_biometrics(bio_data)
 
-    st.markdown("<hr class='custom-divider'/>", unsafe_allow_html=True)
+    st.html("<hr class='custom-divider'/>")
 
     # Ato 6: Explorador de Seções e Cartões Metodológicos
     render_explorer()
@@ -92,7 +92,7 @@ def main() -> None:
         "sob o protocolo SDD (Spec-Driven Development)."
         "</div>"
     )
-    st.markdown(footer_html, unsafe_allow_html=True)
+    st.html(footer_html)
 
 
 if __name__ == "__main__":

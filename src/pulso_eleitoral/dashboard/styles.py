@@ -210,4 +210,4 @@ def apply_custom_styles() -> None:
     Raises:
         Nenhum.
     """
-    st.markdown(DASHBOARD_CSS, unsafe_allow_html=True)
+    st.html(DASHBOARD_CSS)

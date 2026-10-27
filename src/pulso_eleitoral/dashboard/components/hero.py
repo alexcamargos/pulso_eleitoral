@@ -75,4 +75,4 @@ def render_hero(kpis: dict[str, Any]) -> None:
         </div>
     </div>
     """
-    st.markdown(html, unsafe_allow_html=True)
+    st.html(html)

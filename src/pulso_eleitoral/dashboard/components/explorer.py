@@ -23,7 +23,7 @@ def render_explorer(db_path: str = "data/pulso_eleitoral.duckdb") -> None:
     Raises:
         Nenhum.
     """
-    st.markdown(
+    st.html(
         """
         <div class="section-tag">Auditoria Direta</div>
         <h2 class="section-title">Explorador de seções eleitorais</h2>
@@ -31,8 +31,7 @@ def render_explorer(db_path: str = "data/pulso_eleitoral.duckdb") -> None:
             Inspecione as seções com encerramento tardio no país.
             Filtre por estado ou pesquise o município para auditar a zona e seção.
         </p>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
     col_filtro1, col_filtro2 = st.columns([1, 3])
@@ -91,9 +90,9 @@ def render_explorer(db_path: str = "data/pulso_eleitoral.duckdb") -> None:
     else:
         st.info("Nenhuma seção encontrada com os filtros informados.")
 
-    st.markdown("<hr class='custom-divider'/>", unsafe_allow_html=True)
+    st.html("<hr class='custom-divider'/>")
 
-    st.markdown(
+    st.html(
         """
         <div class="section-tag">Transparência Radical</div>
         <h2 class="section-title">Contamos linha por linha: como calculamos</h2>
@@ -101,13 +100,12 @@ def render_explorer(db_path: str = "data/pulso_eleitoral.duckdb") -> None:
             O pipeline Pulso Eleitoral decodifica diretamente os artefatos binários
             oficiais disponibilizados pelo Tribunal Superior Eleitoral (TSE).
         </p>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
     m1, m2 = st.columns(2)
     with m1:
-        st.markdown(
+        st.html(
             """
             <div class="method-card">
                 <span class="method-tag">1. O Log da Urna (logd.dat)</span>
@@ -119,12 +117,7 @@ def render_explorer(db_path: str = "data/pulso_eleitoral.duckdb") -> None:
                     carimbo temporal auditável UTC/BRT.
                 </p>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
-        st.markdown(
-            """
+            <div style="height: 12px;"></div>
             <div class="method-card">
                 <span class="method-tag">2. Urnas Substituídas</span>
                 <div class="method-title">Cadeia Histórica Preservada</div>
@@ -135,12 +128,11 @@ def render_explorer(db_path: str = "data/pulso_eleitoral.duckdb") -> None:
                     única linha temporal contínua e sem duplicações.
                 </p>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
 
     with m2:
-        st.markdown(
+        st.html(
             """
             <div class="method-card">
                 <span class="method-tag">3. Reconciliação com o BU</span>
@@ -152,12 +144,7 @@ def render_explorer(db_path: str = "data/pulso_eleitoral.duckdb") -> None:
                     recebe um alerta imediato.
                 </p>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
-        st.markdown(
-            """
+            <div style="height: 12px;"></div>
             <div class="method-card">
                 <span class="method-tag">4. Fuso Horário Normalizado</span>
                 <div class="method-title">Hora de Brasília (BRT / UTC-3)</div>
@@ -168,6 +155,5 @@ def render_explorer(db_path: str = "data/pulso_eleitoral.duckdb") -> None:
                     de tempo nacional.
                 </p>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )

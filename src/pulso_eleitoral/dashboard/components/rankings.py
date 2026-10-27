@@ -27,7 +27,7 @@ def render_rankings(
     Raises:
         Nenhum.
     """
-    st.markdown(
+    st.html(
         """
         <div class="section-tag">Estados e Municípios</div>
         <h2 class="section-title">Onde mais pessoas votaram depois das 17h</h2>
@@ -37,8 +37,7 @@ def render_rankings(
             (Amazonas e Acre) onde fuso horário e logística local resultaram em maior
             proporção relativa no comparecimento final.
         </p>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
     col1, col2 = st.columns(2)

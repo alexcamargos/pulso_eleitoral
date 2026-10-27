@@ -23,7 +23,7 @@ def render_map_view(df_map: pd.DataFrame) -> None:
     Raises:
         Nenhum.
     """
-    st.markdown(
+    st.html(
         """
         <div class="section-tag">Onde</div>
         <h2 class="section-title">Cada círculo é um polo de votação</h2>
@@ -32,8 +32,7 @@ def render_map_view(df_map: pd.DataFrame) -> None:
             votaram após as 17h. O raio e o brilho refletem o volume absoluto de votos.
             Utilize a barra temporal abaixo para rebobinar o encerramento pelo país.
         </p>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
     if df_map.empty:
