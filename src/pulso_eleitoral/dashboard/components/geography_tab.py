@@ -1,6 +1,6 @@
 """Componente da Aba 2: Geografia da Anomalia (Megalópoles vs Sudoeste Amazônico).
 
-Apresenta o mapa geoespacial Pydeck estilizado no padrão Margem Eleitoral,
+Apresenta o mapa geoespacial Pydeck estilizado,
 além do confronto dos dois eixos de impacto: volume absoluto vs impacto relativo.
 """
 
@@ -96,9 +96,9 @@ def render_geography_tab(
             df_filtered["municipio_nome"].str.contains(search_mun.upper(), na=False)
         ]
 
-    # Raio visual proporcional
+    # Raio visual proporcional calibrado para evitar saturação e cortes
     df_filtered["raio_metros"] = df_filtered["votos_pos"].apply(
-        lambda v: min(v * 12 + 3500, 75000)
+        lambda v: min(v * 10 + 3500, 48000)
     )
 
     layer = pdk.Layer(
@@ -113,11 +113,12 @@ def render_geography_tab(
         auto_highlight=True,
     )
 
+    # Enquadramento territorial completo para evitar corte de pontos nos extremos
     view_state = pdk.ViewState(
-        latitude=-14.235,
-        longitude=-51.925,
-        zoom=3.8,
-        min_zoom=3,
+        latitude=-15.0,
+        longitude=-53.5,
+        zoom=3.3,
+        min_zoom=2.5,
         max_zoom=10,
         pitch=0,
     )
@@ -191,16 +192,24 @@ def render_geography_tab(
                     hovertemplate="<b>%{y}</b>: %{x:,.0f} votos<extra></extra>",
                 )
             )
+            max_cap = (
+                float(df_cap["votos_pos"].max()) if not df_cap.empty else 5000.0
+            )
             fig_cap.update_layout(
                 template="plotly_dark",
                 paper_bgcolor="#181B20",
                 plot_bgcolor="#121417",
-                height=340,
-                margin=dict(l=10, r=40, t=10, b=20),
+                height=350,
+                margin=dict(l=150, r=50, t=15, b=25),
                 xaxis=dict(
                     title="Votos Pós-17h",
+                    range=[0, max_cap * 1.18],
                     gridcolor="#282D37",
                     zerolinecolor="#282D37",
+                    automargin=True,
+                ),
+                yaxis=dict(
+                    automargin=True,
                 ),
             )
             st.plotly_chart(fig_cap, use_container_width=True)
@@ -236,16 +245,24 @@ def render_geography_tab(
                     hovertemplate="<b>%{y}</b>: %{x:.2f}% dos votos<extra></extra>",
                 )
             )
+            max_prop = (
+                float(df_prop["pct_pos"].max()) if not df_prop.empty else 10.0
+            )
             fig_prop.update_layout(
                 template="plotly_dark",
                 paper_bgcolor="#181B20",
                 plot_bgcolor="#121417",
-                height=340,
-                margin=dict(l=10, r=40, t=10, b=20),
+                height=350,
+                margin=dict(l=165, r=50, t=15, b=25),
                 xaxis=dict(
                     title="% em Relação ao Total de Votos do Município",
+                    range=[0, max_prop * 1.18],
                     gridcolor="#282D37",
                     zerolinecolor="#282D37",
+                    automargin=True,
+                ),
+                yaxis=dict(
+                    automargin=True,
                 ),
             )
             st.plotly_chart(fig_prop, use_container_width=True)

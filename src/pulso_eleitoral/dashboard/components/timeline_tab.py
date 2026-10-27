@@ -1,7 +1,7 @@
 """Componente da Aba 1: Anatomia do Fluxo Temporal e Física de Vazão.
 
-Apresenta a série temporal minuto a minuto utilizando Plotly estilizado no padrão
-Margem Eleitoral, destacando a absorção inicial e o platô anômalo das 18h.
+Apresenta a série temporal minuto a minuto utilizando Plotly estilizado,
+destacando a absorção inicial e o platô anômalo das 18h.
 """
 
 from __future__ import annotations
@@ -74,7 +74,8 @@ def render_timeline_tab(df_timeline: pd.DataFrame) -> None:
         go.Scatter(
             x=df_timeline["minuto"],
             y=df_timeline["pct_acumulado"],
-            mode="lines",
+            mode="lines+markers",
+            marker=dict(color="#10B981", size=4),
             line=dict(color="#10B981", width=2.5, dash="dot"),
             yaxis="y2",
             name="% Acumulado da Janela",
@@ -130,16 +131,19 @@ def render_timeline_tab(df_timeline: pd.DataFrame) -> None:
         bordercolor="#64748B",
     )
 
+    max_votos = float(df_timeline["votos"].max()) if not df_timeline.empty else 13000.0
+    y_max = max(max_votos * 1.15, 14500.0)
+
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor="#181B20",
         plot_bgcolor="#121417",
-        height=400,
-        margin=dict(l=20, r=20, t=30, b=30),
+        height=440,
+        margin=dict(l=55, r=55, t=65, b=65),
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.02,
+            y=1.04,
             xanchor="right",
             x=1,
             font=dict(size=11, color="#94A3B8"),
@@ -151,12 +155,15 @@ def render_timeline_tab(df_timeline: pd.DataFrame) -> None:
             nticks=25,
             gridcolor="#282D37",
             zerolinecolor="#282D37",
+            automargin=True,
         ),
         yaxis=dict(
             title="Votos por Minuto",
             title_font=dict(size=12, color="#38BDF8"),
+            range=[0, y_max],
             gridcolor="#282D37",
             zerolinecolor="#282D37",
+            automargin=True,
         ),
         yaxis2=dict(
             title="% Acumulado da Janela",
@@ -165,6 +172,7 @@ def render_timeline_tab(df_timeline: pd.DataFrame) -> None:
             side="right",
             range=[0, 105],
             showgrid=False,
+            automargin=True,
         ),
         hovermode="x unified",
     )
