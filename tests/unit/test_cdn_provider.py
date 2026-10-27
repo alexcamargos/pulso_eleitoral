@@ -712,4 +712,3 @@ async def test_cdn_provider_cs_url_429_extended_retries(
     cooldown_sleeps = [s for s in sleeps if s >= 5.0]
     assert len(cooldown_sleeps) == 3
     await client.aclose()
-

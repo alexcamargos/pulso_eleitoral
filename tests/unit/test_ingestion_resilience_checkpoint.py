@@ -358,4 +358,3 @@ async def test_token_bucket_cooldown() -> None:
     assert len(waited) == 1
     assert waited[0] >= 14.9
     assert fake_now >= 1015.0
-

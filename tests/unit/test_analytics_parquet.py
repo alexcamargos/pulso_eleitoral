@@ -343,4 +343,3 @@ def test_parquet_writer_get_next_chunk_id(tmp_path: Path) -> None:
 
     # 5. Próximo deve ser 3
     assert writer.get_next_chunk_id(2022, 1, "PE", 406) == 3
-
