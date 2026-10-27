@@ -88,12 +88,12 @@ def render_integrity_tab(bio_data: dict[str, Any]) -> None:
             template="plotly_dark",
             paper_bgcolor="#181B20",
             plot_bgcolor="#121417",
-            height=260,
-            margin=dict(l=10, r=20, t=10, b=20),
+            height=270,
+            margin=dict(l=150, r=25, t=45, b=30),
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=1.05,
+                y=1.10,
                 xanchor="center",
                 x=0.5,
                 font=dict(color="#94A3B8", size=11),
@@ -103,6 +103,10 @@ def render_integrity_tab(bio_data: dict[str, Any]) -> None:
                 range=[0, 100],
                 gridcolor="#282D37",
                 zerolinecolor="#282D37",
+                automargin=True,
+            ),
+            yaxis=dict(
+                automargin=True,
             ),
         )
         st.plotly_chart(fig, use_container_width=True)
